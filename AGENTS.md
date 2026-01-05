@@ -10,6 +10,7 @@ This project is a Spring Boot Starter library that implements the Resequence Ent
 ## Technology Stack
 - **Framework**: Spring Boot 4.x
 - **Language**: Java 21+
+- **Tools** Lombok, Apache Commons, Google Guava
 - **Build Tool**: Gradle (Kotlin DSL)
 - **Testing**: Spock 2.4+ (Groovy 5.x)
 
