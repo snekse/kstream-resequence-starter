@@ -1,15 +1,13 @@
 plugins {
     id("org.springframework.boot")
     id("groovy")
+    id("io.freefair.lombok") version "9.1.0"
 }
 
 dependencies {
     implementation(project(":resequence-starter"))
-    implementation("org.springframework.kafka:spring-kafka")
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("com.fasterxml.jackson.core:jackson-databind")
-
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.kafka:spring-kafka-test")
