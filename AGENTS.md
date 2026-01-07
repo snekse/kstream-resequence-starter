@@ -28,6 +28,7 @@ This project is a Spring Boot Starter library that implements the Resequence Ent
 - Follow standard Spring Boot starter patterns.
 - Ensure all new features are covered by Spock tests.
 - When modifying the starter, ensure the sample app is updated to reflect changes.
+- Refer to the `./.agents` directory for project-specific Rules, Workflows, and Skills.
 
 ## Future Roadmap
 - Support for plain Apache Kafka (non-Spring) in a future sample app.
