@@ -18,7 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SampleProducer {
 
-    private final KafkaTemplate<Object, Object> kafkaTemplate;
+    private final KafkaTemplate<Long, SampleRecord> kafkaTemplate;
     private static final String TOPIC = "sample-topic";
 
     public void produceSampleData() {
@@ -48,8 +48,7 @@ public class SampleProducer {
         clientId = 1002L;
         records.add(createRecord(clientId, "CREATE", timestamp, EntityType.ChildA));
 
-        // Sequence 3: Child B for Client 1003 (Update before Create logic check?)
-        // Let's just do simple sequences for now as requested.
+        // Sequence 3: Child B for Client 1003
         clientId = 1003L;
         records.add(createRecord(clientId, "CREATE", timestamp, EntityType.ChildB));
         records.add(createRecord(clientId, "UPDATE", timestamp + 500, EntityType.ChildB));
