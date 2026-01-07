@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SampleConsumer {
 
-    @KafkaListener(topics = "sample-topic", groupId = "sample-group")
+    @KafkaListener(topics = "${app.topic.name:sample-topic}", groupId = "sample-group")
     public void consume(SampleRecord record) {
         log.info("Consumed record: {}", record);
     }

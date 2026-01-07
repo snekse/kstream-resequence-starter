@@ -4,6 +4,7 @@ import com.example.sampleapp.domain.EntityType;
 import com.example.sampleapp.domain.SampleRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,8 +19,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SampleProducer {
 
-    private final KafkaTemplate<Long, SampleRecord> kafkaTemplate;
-    private static final String TOPIC = "sample-topic";
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
+
+    @Value("${app.topic.name:sample-topic}")
+    private String topic;
 
     public void produceSampleData() {
         List<SampleRecord> records = generateRecords();
@@ -30,7 +33,7 @@ public class SampleProducer {
         log.info("Producing {} records out of order...", records.size());
         records.forEach(record -> {
             log.info("Sending record: {}", record);
-            kafkaTemplate.send(TOPIC, record.getClientId(), record);
+            kafkaTemplate.send(topic, record.getClientId(), record);
         });
     }
 
