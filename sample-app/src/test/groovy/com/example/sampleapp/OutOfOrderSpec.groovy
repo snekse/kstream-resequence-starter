@@ -6,22 +6,21 @@ import com.example.sampleapp.producer.SampleProducer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.spockframework.runtime.model.FeatureMetadata
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.test.context.EmbeddedKafka
+import org.springframework.kafka.test.utils.KafkaTestUtils
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import java.util.concurrent.BlockingQueue
-import java.util.concurrent.LinkedBlockingQueue
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 @SpringBootTest(properties = [
-    'spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}', 
+    'spring.embedded.kafka.brokers.property=spring.kafka.bootstrap-servers',
     'app.topic.name=test-topic'])
 @EmbeddedKafka(topics = ['${app.topic.name}'], partitions = 3)
 @ActiveProfiles('test')
@@ -32,51 +31,35 @@ class OutOfOrderSpec extends Specification {
     SampleProducer producer
 
     @Autowired
-    TestListener listener
+    ConsumerFactory<Object, Object> consumerFactory
+
+    @Value('${app.topic.name}')
+    String topic
 
     @PendingFeature
     def 'should consume messages in logical order despite out-of-order production'() {
-        given: 'a set of records produced out-of-order'
-        producer.produceSampleData()
+        given: 'a test consumer'
+        def consumer = consumerFactory.createConsumer('test-group', 'test-client')
+        consumer.subscribe([topic])
 
-        when: 'messages are consumed'
-        List<SampleRecord> consumedRecords = []
-        // We expect 6 records based on SampleProducer logic:
-        // 3 for Client 1001, 1 for Client 1002, 2 for Client 1003
-        6.times {
-            def record = listener.records.poll(10, TimeUnit.SECONDS)
-            if (record != null) {
-                consumedRecords << record
-            }
-        }
+        when: 'messages are produced and thereafter consumed'
+        producer.produceSampleData()
+        
+        // Use KafkaTestUtils to wait for exactly 6 records
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 6)
+        consumer.close()
 
         then: 'all records are received'
-        consumedRecords.size() == 6
+        records.count() == 6
 
         and: 'records for client 1001 are in correct logical order (Create -> Update -> Delete)'
-        def client1Records = consumedRecords.findAll { it.clientId == 1001L }
+        // Extract values from ConsumerRecords
+        def allRecords = records.toList().collect { it.value() as SampleRecord }
+        def client1Records = allRecords.findAll { it.clientId == 1001L }
+        
         client1Records.size() == 3
         client1Records[0].operationType == 'CREATE'
         client1Records[1].operationType == 'UPDATE'
         client1Records[2].operationType == 'DELETE'
-
-        // The above assertion is expected to fail because we are shuffling them and not resequencing.
-    }
-
-    @TestConfiguration
-    static class Config {
-        @Bean
-        TestListener testListener() {
-            return new TestListener()
-        }
-    }
-
-    static class TestListener {
-        BlockingQueue<SampleRecord> records = new LinkedBlockingQueue<>()
-
-        @KafkaListener(topics = '${app.topic.name}', groupId = 'test-group')
-        void consume(SampleRecord record) {
-            records.add(record)
-        }
     }
 }

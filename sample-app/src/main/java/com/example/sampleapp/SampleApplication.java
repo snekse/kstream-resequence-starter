@@ -35,16 +35,14 @@ public class SampleApplication {
         @Profile("!test")
         public EmbeddedKafkaBroker embeddedKafkaBroker(
                         @Value("${app.topic.name:sample-topic}") String topic) {
-                return new EmbeddedKafkaKraftBroker(1, 3, topic)
-                                .brokerListProperty("spring.kafka.bootstrap-servers");
+                return new EmbeddedKafkaKraftBroker(1, 3, topic);
         }
 
         @Bean
         @Profile("!test")
         public ProducerFactory<Object, Object> producerFactory(EmbeddedKafkaBroker broker, KafkaProperties properties) {
                 Map<String, Object> props = properties.buildProducerProperties();
-                props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                                broker.getBrokersAsString());
+                props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
                 return new DefaultKafkaProducerFactory<>(props);
         }
 
@@ -52,8 +50,7 @@ public class SampleApplication {
         @Profile("!test")
         public ConsumerFactory<Object, Object> consumerFactory(EmbeddedKafkaBroker broker, KafkaProperties properties) {
                 Map<String, Object> props = properties.buildConsumerProperties();
-                props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                                broker.getBrokersAsString());
+                props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
                 return new DefaultKafkaConsumerFactory<>(props);
         }
 }
