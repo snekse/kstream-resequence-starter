@@ -1,10 +1,12 @@
 spring:
   kafka:
+    streams:
+      application-id: sample-app-streams
     consumer:
       group-id: sample-group
       auto-offset-reset: earliest
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      key-deserializer: org.apache.kafka.common.serialization.LongDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         spring.json.trusted.packages: "*"
     producer:
@@ -12,8 +14,11 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 app:
-  topic:
-    name: sample-topic
+  pipeline:
+    source:
+      topic: sample-topic
+    sink:
+      topic: ${app.pipeline.source.topic}-resequenced
 
 logging:
   level:

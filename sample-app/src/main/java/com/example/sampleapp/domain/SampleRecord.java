@@ -14,6 +14,7 @@ import java.util.UUID;
 public class SampleRecord {
     private Long clientId;
     private String operationType;
+    private String newKey;
     private UUID transactionId;
     private Long timestamp;
     private EntityType entityType;

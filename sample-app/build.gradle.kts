@@ -7,7 +7,8 @@ plugins {
 dependencies {
     implementation(project(":resequence-starter"))
     implementation("org.springframework.boot:spring-boot-starter-kafka")
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("org.apache.kafka:kafka-streams")
+    implementation("tools.jackson.core:jackson-databind")
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")

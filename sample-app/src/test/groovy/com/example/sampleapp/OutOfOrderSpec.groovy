@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit
 
 @SpringBootTest(properties = [
     'spring.embedded.kafka.brokers.property=spring.kafka.bootstrap-servers',
-    'app.topic.name=test-topic'])
-@EmbeddedKafka(topics = ['${app.topic.name}'], partitions = 3)
+    'app.pipeline.source.topic=test-topic'])
+@EmbeddedKafka(topics = ['${app.pipeline.source.topic}', '${app.pipeline.source.topic}-resequenced'], partitions = 3)
 @ActiveProfiles('test')
 @DirtiesContext
 class OutOfOrderSpec extends Specification {
@@ -33,7 +33,7 @@ class OutOfOrderSpec extends Specification {
     @Autowired
     ConsumerFactory<Object, Object> consumerFactory
 
-    @Value('${app.topic.name}')
+    @Value('${app.pipeline.sink.topic}')
     String topic
 
     @PendingFeature
@@ -59,7 +59,10 @@ class OutOfOrderSpec extends Specification {
         
         client1Records.size() == 3
         client1Records[0].operationType == 'CREATE'
+        client1Records[0].newKey != null
         client1Records[1].operationType == 'UPDATE'
+        client1Records[1].newKey != null
         client1Records[2].operationType == 'DELETE'
+        client1Records[2].newKey != null
     }
 }

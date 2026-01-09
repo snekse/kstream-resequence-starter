@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SampleConsumer {
 
-    @KafkaListener(topics = "${app.topic.name:sample-topic}", groupId = "sample-group")
+    @KafkaListener(topics = "${app.pipeline.sink.topic:sample-topic-resequenced}", groupId = "sample-group")
     public void consume(SampleRecord record,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset) {

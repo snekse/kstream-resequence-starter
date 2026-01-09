@@ -21,7 +21,7 @@ public class SampleProducer {
 
     private final KafkaTemplate<Object, Object> kafkaTemplate;
 
-    @Value("${app.topic.name:sample-topic}")
+    @Value("${app.pipeline.source.topic:sample-topic}")
     private String topic;
 
     public void produceSampleData() {
