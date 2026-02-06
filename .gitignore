@@ -27,3 +27,6 @@ replay_pid*
 .gradle/
 /build/
 **/build/
+
+# Claude Code local settings
+.claude/
