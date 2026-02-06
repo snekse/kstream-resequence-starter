@@ -26,8 +26,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.EmbeddedKafkaKraftBroker;
 
@@ -63,10 +62,12 @@ public class SampleApplication {
                                 Serdes.Long(),
                                 new SampleRecordListSerde()));
 
+                var sampleRecordSerde = new JacksonJsonSerde<>(SampleRecord.class);
+
                 // Add source
                 topology.addSource("source",
                                 Serdes.Long().deserializer(),
-                                new JsonDeserializer<>(SampleRecord.class).trustedPackages("*"),
+                                sampleRecordSerde.deserializer(),
                                 sourceTopic);
 
                 // Add processor
@@ -81,7 +82,7 @@ public class SampleApplication {
                 topology.addSink("sink",
                                 sinkTopic,
                                 Serdes.String().serializer(),
-                                new JsonSerializer<SampleRecord>(),
+                                sampleRecordSerde.serializer(),
                                 "resequencer");
 
                 return topology;
@@ -113,8 +114,7 @@ public class SampleApplication {
         @Bean(name = KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME)
         @Profile("!test")
         public KafkaStreamsConfiguration kStreamsConfigs(KafkaProperties kafkaProperties, EmbeddedKafkaBroker broker) {
-                Map<String, Object> props = new HashMap<>();
-                props.putAll(kafkaProperties.buildStreamsProperties());
+                Map<String, Object> props = new HashMap<>(kafkaProperties.buildStreamsProperties());
                 props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
                 return new KafkaStreamsConfiguration(props);
         }
