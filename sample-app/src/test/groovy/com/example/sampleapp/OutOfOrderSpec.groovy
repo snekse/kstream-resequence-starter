@@ -1,10 +1,8 @@
 package com.example.sampleapp
 
-import com.example.sampleapp.domain.EntityType
+
 import com.example.sampleapp.domain.SampleRecord
 import com.example.sampleapp.producer.SampleProducer
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.spockframework.runtime.model.FeatureMetadata
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
@@ -17,7 +15,6 @@ import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 @SpringBootTest(properties = [
     'spring.embedded.kafka.brokers.property=spring.kafka.bootstrap-servers',
@@ -44,7 +41,7 @@ class OutOfOrderSpec extends Specification {
 
         when: 'messages are produced and thereafter consumed'
         producer.produceSampleData()
-        
+
         // Use KafkaTestUtils to wait for exactly 6 records
         def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 6)
         consumer.close()
@@ -56,7 +53,7 @@ class OutOfOrderSpec extends Specification {
         // Extract values from ConsumerRecords
         def allRecords = records.toList().collect { it.value() as SampleRecord }
         def client1Records = allRecords.findAll { it.clientId == 1001L }
-        
+
         client1Records.size() == 3
         client1Records[0].operationType == 'CREATE'
         client1Records[0].newKey != null
