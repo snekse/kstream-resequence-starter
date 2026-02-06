@@ -1,33 +1,28 @@
 package com.example.sampleapp.processor;
 
+import com.example.sampleapp.domain.BufferedRecord;
 import com.example.sampleapp.domain.SampleRecord;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
 import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.springframework.kafka.support.serializer.JsonSerde;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord, String, SampleRecord> {
 
-    private static final Map<String, Integer> OPERATION_ORDER = Map.of(
-            "CREATE", 0,
-            "UPDATE", 1,
-            "DELETE", 2);
-
     private final String sinkTopic;
-    private KeyValueStore<Long, List<SampleRecord>> store;
+    private final Comparator<BufferedRecord> comparator;
+    private KeyValueStore<Long, List<BufferedRecord>> store;
 
-    public ResequenceProcessor(String sinkTopic) {
+    public ResequenceProcessor(String sinkTopic, Comparator<BufferedRecord> comparator) {
         this.sinkTopic = sinkTopic;
+        this.comparator = comparator;
     }
 
     @Override
@@ -44,30 +39,38 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         Long key = record.key();
         SampleRecord value = record.value();
 
+        // Wrap with Kafka metadata for proper ordering
+        BufferedRecord buffered = BufferedRecord.builder()
+                .record(value)
+                .partition(context().recordMetadata().map(m -> m.partition()).orElse(-1))
+                .offset(context().recordMetadata().map(m -> m.offset()).orElse(-1L))
+                .timestamp(record.timestamp())
+                .build();
+
         // Get or create list for this key
-        List<SampleRecord> records = store.get(key);
+        List<BufferedRecord> records = store.get(key);
         if (records == null) {
             records = new ArrayList<>();
         }
-        records.add(value);
+        records.add(buffered);
         store.put(key, records);
     }
 
     private void flushAll(long timestamp) {
-        try (KeyValueIterator<Long, List<SampleRecord>> iter = store.all()) {
+        try (KeyValueIterator<Long, List<BufferedRecord>> iter = store.all()) {
             while (iter.hasNext()) {
                 var entry = iter.next();
                 Long key = entry.key;
-                List<SampleRecord> records = entry.value;
+                List<BufferedRecord> records = entry.value;
 
                 if (records != null && !records.isEmpty()) {
-                    // Sort by operation type
-                    records.sort(Comparator.comparingInt(r ->
-                            OPERATION_ORDER.getOrDefault(r.getOperationType(), Integer.MAX_VALUE)));
+                    // Sort using the injected comparator
+                    records.sort(comparator);
 
                     // Forward each record
                     String newKey = key + "-sorted";
-                    for (SampleRecord r : records) {
+                    for (BufferedRecord br : records) {
+                        SampleRecord r = br.getRecord();
                         r.setNewKey(newKey);
                         context().forward(new Record<>(newKey, r, timestamp));
                     }

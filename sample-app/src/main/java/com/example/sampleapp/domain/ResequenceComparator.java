@@ -1,8 +1,11 @@
 package com.example.sampleapp.domain;
 
+import org.springframework.stereotype.Component;
+
 import java.util.Comparator;
 import java.util.Map;
 
+@Component
 public class ResequenceComparator implements Comparator<BufferedRecord> {
 
     // Define order: CREATE (0) < UPDATE (1) < DELETE (2)

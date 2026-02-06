@@ -1,8 +1,9 @@
 package com.example.sampleapp.config;
 
+import com.example.sampleapp.domain.BufferedRecord;
 import com.example.sampleapp.domain.SampleRecord;
 import com.example.sampleapp.processor.ResequenceProcessor;
-import com.example.sampleapp.serde.SampleRecordListSerde;
+import com.example.sampleapp.serde.BufferedRecordListSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -14,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Configuration
@@ -26,8 +28,8 @@ public class ResequenceTopologyConfig {
     }
 
     @Bean
-    public Serde<List<SampleRecord>> sampleRecordListSerde() {
-        return new SampleRecordListSerde();
+    public Serde<List<BufferedRecord>> bufferedRecordListSerde() {
+        return new BufferedRecordListSerde();
     }
 
     @Bean
@@ -36,7 +38,8 @@ public class ResequenceTopologyConfig {
             @Value("${app.pipeline.sink.topic}") String sinkTopic,
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
-            Serde<List<SampleRecord>> sampleRecordListSerde) {
+            Serde<List<BufferedRecord>> bufferedRecordListSerde,
+            Comparator<BufferedRecord> resequenceComparator) {
 
         Topology topology = builder.build();
 
@@ -44,7 +47,7 @@ public class ResequenceTopologyConfig {
         topology.addStateStore(Stores.keyValueStoreBuilder(
                 Stores.persistentKeyValueStore("resequence-buffer"),
                 Serdes.Long(),
-                sampleRecordListSerde));
+                bufferedRecordListSerde));
 
         // Add source
         topology.addSource("source",
@@ -52,9 +55,9 @@ public class ResequenceTopologyConfig {
                 sampleRecordSerde.deserializer(),
                 sourceTopic);
 
-        // Add processor
+        // Add processor with injected comparator
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor(sinkTopic),
+                () -> new ResequenceProcessor(sinkTopic, resequenceComparator),
                 "source");
 
         // Connect state store to processor

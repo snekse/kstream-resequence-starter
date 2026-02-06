@@ -1,6 +1,6 @@
 package com.example.sampleapp.serde;
 
-import com.example.sampleapp.domain.SampleRecord;
+import com.example.sampleapp.domain.BufferedRecord;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
@@ -10,13 +10,13 @@ import org.apache.kafka.common.serialization.Serializer;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SampleRecordListSerde implements Serde<List<SampleRecord>> {
+public class BufferedRecordListSerde implements Serde<List<BufferedRecord>> {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final TypeReference<List<SampleRecord>> TYPE_REF = new TypeReference<>() {};
+    private static final TypeReference<List<BufferedRecord>> TYPE_REF = new TypeReference<>() {};
 
     @Override
-    public Serializer<List<SampleRecord>> serializer() {
+    public Serializer<List<BufferedRecord>> serializer() {
         return (topic, data) -> {
             if (data == null) return null;
             try {
@@ -28,7 +28,7 @@ public class SampleRecordListSerde implements Serde<List<SampleRecord>> {
     }
 
     @Override
-    public Deserializer<List<SampleRecord>> deserializer() {
+    public Deserializer<List<BufferedRecord>> deserializer() {
         return (topic, data) -> {
             if (data == null) return new ArrayList<>();
             try {
