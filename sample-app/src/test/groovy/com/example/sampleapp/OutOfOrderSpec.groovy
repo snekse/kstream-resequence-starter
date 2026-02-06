@@ -11,7 +11,6 @@ import org.springframework.kafka.test.context.EmbeddedKafka
 import org.springframework.kafka.test.utils.KafkaTestUtils
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.time.Duration
@@ -33,7 +32,6 @@ class OutOfOrderSpec extends Specification {
     @Value('${app.pipeline.sink.topic}')
     String topic
 
-    @PendingFeature
     def 'should consume messages in logical order despite out-of-order production'() {
         given: 'a test consumer'
         def consumer = consumerFactory.createConsumer('test-group', 'test-client')

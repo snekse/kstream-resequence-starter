@@ -56,6 +56,7 @@ Source topic (`sample-topic`) → Resequencing processor with state store → Si
 - Use single quotes for plain strings (`'Foo'`), GStrings only when interpolating (`"$firstName $lastName"`)
 - Leverage Groovy collection comprehensions
 - Test files must be named `*Spec.groovy`
+- **`@PendingFeature` workflow**: Marks a test as "expected to fail". Implement the feature until the test passes (causing the annotation to fail), then remove `@PendingFeature` and verify tests pass.
 
 ## Agent Infrastructure
 

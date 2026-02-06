@@ -1,16 +1,16 @@
 package com.example.sampleapp;
 
 import com.example.sampleapp.domain.SampleRecord;
-import org.apache.kafka.streams.KeyValue;
+import com.example.sampleapp.processor.ResequenceProcessor;
 import com.example.sampleapp.producer.SampleProducer;
+import com.example.sampleapp.serde.SampleRecordListSerde;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.state.Stores;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -19,14 +19,15 @@ import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
-import org.apache.kafka.streams.StreamsConfig;
 import org.springframework.kafka.annotation.KafkaStreamsDefaultConfiguration;
 import org.springframework.kafka.config.KafkaStreamsConfiguration;
+import org.springframework.kafka.config.StreamsBuilderFactoryBean;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JacksonJsonSerde;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.EmbeddedKafkaKraftBroker;
 
@@ -42,29 +43,48 @@ public class SampleApplication {
         }
 
         @Bean
+        @Profile("!test")
         public CommandLineRunner runner(SampleProducer producer) {
                 return args -> producer.produceSampleData();
         }
 
         @Bean
-        public KStream<Long, SampleRecord> resequencingStream(StreamsBuilder builder,
+        public Topology resequencingTopology(
                         @Value("${app.pipeline.source.topic}") String sourceTopic,
-                        @Value("${app.pipeline.sink.topic}") String sinkTopic) {
+                        @Value("${app.pipeline.sink.topic}") String sinkTopic,
+                        StreamsBuilder builder) {
 
-                KStream<Long, SampleRecord> stream = builder.stream(sourceTopic,
-                                Consumed.with(Serdes.Long(), new JacksonJsonSerde<>(SampleRecord.class)));
+                // Build topology using low-level API for full control
+                Topology topology = builder.build();
 
-                stream
-                                .map((key, value) -> {
-                                        String newKey = key + "-sorted";
-                                        value.setNewKey(newKey);
-                                        return KeyValue.pair(newKey, value);
-                                })
-                                .to(sinkTopic,
-                                                Produced.with(Serdes.String(),
-                                                                new JacksonJsonSerde<>(SampleRecord.class)));
+                // Add state store
+                topology.addStateStore(Stores.keyValueStoreBuilder(
+                                Stores.persistentKeyValueStore("resequence-buffer"),
+                                Serdes.Long(),
+                                new SampleRecordListSerde()));
 
-                return stream;
+                // Add source
+                topology.addSource("source",
+                                Serdes.Long().deserializer(),
+                                new JsonDeserializer<>(SampleRecord.class).trustedPackages("*"),
+                                sourceTopic);
+
+                // Add processor
+                topology.addProcessor("resequencer",
+                                () -> new ResequenceProcessor(sinkTopic),
+                                "source");
+
+                // Connect state store to processor
+                topology.connectProcessorAndStateStores("resequencer", "resequence-buffer");
+
+                // Add sink
+                topology.addSink("sink",
+                                sinkTopic,
+                                Serdes.String().serializer(),
+                                new JsonSerializer<SampleRecord>(),
+                                "resequencer");
+
+                return topology;
         }
 
         @Bean
@@ -96,7 +116,6 @@ public class SampleApplication {
                 Map<String, Object> props = new HashMap<>();
                 props.putAll(kafkaProperties.buildStreamsProperties());
                 props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
-                // Ensure application.id is set if not in properties, but it is in yaml
                 return new KafkaStreamsConfiguration(props);
         }
 }
