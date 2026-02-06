@@ -26,7 +26,10 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
+import org.apache.kafka.common.serialization.Serde;
 import org.springframework.kafka.support.serializer.JacksonJsonSerde;
+
+import java.util.List;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.EmbeddedKafkaKraftBroker;
 
@@ -48,10 +51,22 @@ public class SampleApplication {
         }
 
         @Bean
+        public Serde<SampleRecord> sampleRecordSerde() {
+                return new JacksonJsonSerde<>(SampleRecord.class);
+        }
+
+        @Bean
+        public Serde<List<SampleRecord>> sampleRecordListSerde() {
+                return new SampleRecordListSerde();
+        }
+
+        @Bean
         public Topology resequencingTopology(
                         @Value("${app.pipeline.source.topic}") String sourceTopic,
                         @Value("${app.pipeline.sink.topic}") String sinkTopic,
-                        StreamsBuilder builder) {
+                        StreamsBuilder builder,
+                        Serde<SampleRecord> sampleRecordSerde,
+                        Serde<List<SampleRecord>> sampleRecordListSerde) {
 
                 // Build topology using low-level API for full control
                 Topology topology = builder.build();
@@ -60,9 +75,7 @@ public class SampleApplication {
                 topology.addStateStore(Stores.keyValueStoreBuilder(
                                 Stores.persistentKeyValueStore("resequence-buffer"),
                                 Serdes.Long(),
-                                new SampleRecordListSerde()));
-
-                var sampleRecordSerde = new JacksonJsonSerde<>(SampleRecord.class);
+                                sampleRecordListSerde));
 
                 // Add source
                 topology.addSource("source",
