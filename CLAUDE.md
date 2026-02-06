@@ -52,11 +52,8 @@ Source topic (`sample-topic`) → Resequencing processor with state store → Si
 - Avoid fully-qualified names; use imports
 
 **Groovy/Spock:**
-- Avoid FQNs; use imports
-- Use single quotes for plain strings (`'Foo'`), GStrings only when interpolating (`"$firstName $lastName"`)
-- Leverage Groovy collection comprehensions
+- Follow `.agent/skills/self-review-before-finishing-tasks/spock-tests-guide.md` when writing and planning Spock tests
 - Test files must be named `*Spec.groovy`
-- **`@PendingFeature` workflow**: Marks a test as "expected to fail". Implement the feature until the test passes (causing the annotation to fail), then remove `@PendingFeature` and verify tests pass.
 
 ## Agent Infrastructure
 
