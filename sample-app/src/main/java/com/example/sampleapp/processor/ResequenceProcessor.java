@@ -18,17 +18,18 @@ import java.util.List;
 public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord, String, SampleRecord> {
 
     private final Comparator<BufferedRecord<SampleRecord>> comparator;
+    private final String stateStoreName;
     private KeyValueStore<Long, List<BufferedRecord<SampleRecord>>> store;
 
-    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator) {
+    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator, String stateStoreName) {
         this.comparator = comparator;
+        this.stateStoreName = stateStoreName;
     }
 
     @Override
     public void init(ProcessorContext<String, SampleRecord> context) {
         super.init(context);
-        // TODO: Make state store name configurable in application yml
-        this.store = context.getStateStore("resequence-buffer");
+        this.store = context.getStateStore(stateStoreName);
 
         // Schedule punctuator to flush buffered records every 2 seconds (wall-clock time)
         // TODO: Make duration configurable in application yml

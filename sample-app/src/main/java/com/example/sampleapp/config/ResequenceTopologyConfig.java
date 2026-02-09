@@ -36,6 +36,7 @@ public class ResequenceTopologyConfig {
     public Topology resequencingTopology(
             @Value("${app.pipeline.source.topic}") String sourceTopic,
             @Value("${app.pipeline.sink.topic}") String sinkTopic,
+            @Value("${resequence.state-store-name}") String stateStoreName,
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
             Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
@@ -45,7 +46,7 @@ public class ResequenceTopologyConfig {
 
         // Add state store
         topology.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore("resequence-buffer"),
+                Stores.persistentKeyValueStore(stateStoreName),
                 Serdes.Long(),
                 bufferedRecordListSerde));
 
@@ -55,13 +56,13 @@ public class ResequenceTopologyConfig {
                 sampleRecordSerde.deserializer(),
                 sourceTopic);
 
-        // Add processor with injected comparator
+        // Add processor with injected comparator and state store name
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor(resequenceComparator),
+                () -> new ResequenceProcessor(resequenceComparator, stateStoreName),
                 "source");
 
         // Connect state store to processor
-        topology.connectProcessorAndStateStores("resequencer", "resequence-buffer");
+        topology.connectProcessorAndStateStores("resequencer", stateStoreName);
 
         // Add sink
         topology.addSink("sink",
