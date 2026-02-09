@@ -16,6 +16,9 @@ app:
     sink:
       topic: ${app.pipeline.source.topic}-resequenced
 
+resequence:
+  state-store-name: resequence-buffer
+
 logging:
   level:
     com.example.sampleapp: INFO
