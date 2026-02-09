@@ -198,7 +198,7 @@ class OutOfOrderSpec extends Specification {
         orderedRecords[6].operationType == 'DELETE'
     }
 
-    private SampleRecord buildRecord(Long clientId, String operationType, Long timestamp) {
+    private static SampleRecord buildRecord(Long clientId, String operationType, Long timestamp) {
         SampleRecord.builder()
                 .clientId(clientId)
                 .operationType(operationType)

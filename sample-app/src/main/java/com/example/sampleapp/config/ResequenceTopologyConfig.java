@@ -57,7 +57,7 @@ public class ResequenceTopologyConfig {
 
         // Add processor with injected comparator
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor(sinkTopic, resequenceComparator),
+                () -> new ResequenceProcessor(resequenceComparator),
                 "source");
 
         // Connect state store to processor

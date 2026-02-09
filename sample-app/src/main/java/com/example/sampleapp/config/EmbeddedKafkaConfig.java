@@ -1,7 +1,9 @@
 package com.example.sampleapp.config;
 
+import com.example.sampleapp.domain.SampleRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
@@ -30,18 +32,26 @@ public class EmbeddedKafkaConfig {
         return new EmbeddedKafkaKraftBroker(1, 3, topic);
     }
 
+    @SuppressWarnings("unchecked")
     @Bean
-    public ProducerFactory<Object, Object> producerFactory(EmbeddedKafkaBroker broker, KafkaProperties properties) {
+    public ProducerFactory<Object, Object> producerFactory(
+            EmbeddedKafkaBroker broker,
+            KafkaProperties properties,
+            Serde<SampleRecord> sampleRecordSerde) {
         Map<String, Object> props = properties.buildProducerProperties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
-        return new DefaultKafkaProducerFactory<>(props);
+        return new DefaultKafkaProducerFactory(props, null, sampleRecordSerde.serializer());
     }
 
+    @SuppressWarnings("unchecked")
     @Bean
-    public ConsumerFactory<Object, Object> consumerFactory(EmbeddedKafkaBroker broker, KafkaProperties properties) {
+    public ConsumerFactory<Object, Object> consumerFactory(
+            EmbeddedKafkaBroker broker,
+            KafkaProperties properties,
+            Serde<SampleRecord> sampleRecordSerde) {
         Map<String, Object> props = properties.buildConsumerProperties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
-        return new DefaultKafkaConsumerFactory<>(props);
+        return new DefaultKafkaConsumerFactory(props, null, sampleRecordSerde.deserializer());
     }
 
     @Bean(name = KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME)
