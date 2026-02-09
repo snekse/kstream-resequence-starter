@@ -28,8 +28,8 @@ public class ResequenceTopologyConfig {
     }
 
     @Bean
-    public Serde<List<BufferedRecord>> bufferedRecordListSerde() {
-        return new BufferedRecordListSerde();
+    public Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde() {
+        return new BufferedRecordListSerde<>(SampleRecord.class);
     }
 
     @Bean
@@ -38,8 +38,8 @@ public class ResequenceTopologyConfig {
             @Value("${app.pipeline.sink.topic}") String sinkTopic,
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
-            Serde<List<BufferedRecord>> bufferedRecordListSerde,
-            Comparator<BufferedRecord> resequenceComparator) {
+            Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
+            Comparator<BufferedRecord<SampleRecord>> resequenceComparator) {
 
         Topology topology = builder.build();
 

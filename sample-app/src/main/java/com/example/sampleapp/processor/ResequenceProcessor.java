@@ -17,10 +17,10 @@ import java.util.List;
 
 public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord, String, SampleRecord> {
 
-    private final Comparator<BufferedRecord> comparator;
-    private KeyValueStore<Long, List<BufferedRecord>> store;
+    private final Comparator<BufferedRecord<SampleRecord>> comparator;
+    private KeyValueStore<Long, List<BufferedRecord<SampleRecord>>> store;
 
-    public ResequenceProcessor(Comparator<BufferedRecord> comparator) {
+    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator) {
         this.comparator = comparator;
     }
 
@@ -41,7 +41,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         SampleRecord value = record.value();
 
         // Wrap with Kafka metadata for proper ordering
-        BufferedRecord buffered = BufferedRecord.builder()
+        BufferedRecord<SampleRecord> buffered = BufferedRecord.<SampleRecord>builder()
                 .record(value)
                 .partition(context().recordMetadata().map(RecordMetadata::partition).orElse(-1))
                 .offset(context().recordMetadata().map(RecordMetadata::offset).orElse(-1L))
@@ -49,7 +49,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
                 .build();
 
         // Get or create list for this key
-        List<BufferedRecord> records = store.get(key);
+        List<BufferedRecord<SampleRecord>> records = store.get(key);
         if (records == null) {
             records = new ArrayList<>();
         }
@@ -58,11 +58,11 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
     }
 
     private void flushAll(long timestamp) {
-        try (KeyValueIterator<Long, List<BufferedRecord>> iter = store.all()) {
+        try (KeyValueIterator<Long, List<BufferedRecord<SampleRecord>>> iter = store.all()) {
             while (iter.hasNext()) {
                 var entry = iter.next();
                 Long key = entry.key;
-                List<BufferedRecord> records = entry.value;
+                List<BufferedRecord<SampleRecord>> records = entry.value;
 
                 if (records != null && !records.isEmpty()) {
                     // Sort using the injected comparator
@@ -73,7 +73,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
                     //       we might need to switch to needing a mapping service provided.
                     // Forward each record
                     String newKey = key + "-sorted";
-                    for (BufferedRecord br : records) {
+                    for (BufferedRecord<SampleRecord> br : records) {
                         // TODO: An optional Value mapper should be providable the type can be mapped.
                         SampleRecord r = br.getRecord();
                         r.setNewKey(newKey);

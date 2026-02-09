@@ -6,7 +6,7 @@ import java.util.Comparator;
 import java.util.Map;
 
 @Component
-public class ResequenceComparator implements Comparator<BufferedRecord> {
+public class ResequenceComparator implements Comparator<BufferedRecord<SampleRecord>> {
 
     // Define order: CREATE (0) < UPDATE (1) < DELETE (2)
     // Note: User prompt said "CREATE > UPDATE > DELETE", but context implies sort
@@ -18,7 +18,7 @@ public class ResequenceComparator implements Comparator<BufferedRecord> {
             "DELETE", 2);
 
     @Override
-    public int compare(BufferedRecord o1, BufferedRecord o2) {
+    public int compare(BufferedRecord<SampleRecord> o1, BufferedRecord<SampleRecord> o2) {
         SampleRecord r1 = o1.getRecord();
         SampleRecord r2 = o2.getRecord();
 

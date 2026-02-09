@@ -1,7 +1,7 @@
 package com.example.sampleapp.serde;
 
 import com.example.sampleapp.domain.BufferedRecord;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
@@ -10,17 +10,25 @@ import org.apache.kafka.common.serialization.Serializer;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BufferedRecordListSerde implements Serde<List<BufferedRecord>> {
+public class BufferedRecordListSerde<T> implements Serde<List<BufferedRecord<T>>> {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final TypeReference<List<BufferedRecord>> TYPE_REF = new TypeReference<>() {};
+    private final ObjectMapper mapper;
+    private final JavaType javaType;
+
+    public BufferedRecordListSerde(Class<T> recordType) {
+        this.mapper = new ObjectMapper();
+        this.javaType = mapper.getTypeFactory().constructCollectionType(
+                List.class,
+                mapper.getTypeFactory().constructParametricType(BufferedRecord.class, recordType)
+        );
+    }
 
     @Override
-    public Serializer<List<BufferedRecord>> serializer() {
+    public Serializer<List<BufferedRecord<T>>> serializer() {
         return (topic, data) -> {
             if (data == null) return null;
             try {
-                return MAPPER.writeValueAsBytes(data);
+                return mapper.writeValueAsBytes(data);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to serialize list", e);
             }
@@ -28,11 +36,11 @@ public class BufferedRecordListSerde implements Serde<List<BufferedRecord>> {
     }
 
     @Override
-    public Deserializer<List<BufferedRecord>> deserializer() {
+    public Deserializer<List<BufferedRecord<T>>> deserializer() {
         return (topic, data) -> {
             if (data == null) return new ArrayList<>();
             try {
-                return MAPPER.readValue(data, TYPE_REF);
+                return mapper.readValue(data, javaType);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to deserialize list", e);
             }
