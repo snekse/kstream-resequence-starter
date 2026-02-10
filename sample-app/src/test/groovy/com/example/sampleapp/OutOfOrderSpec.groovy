@@ -198,6 +198,98 @@ class OutOfOrderSpec extends Specification {
         orderedRecords[6].operationType == 'DELETE'
     }
 
+    def 'should skip records with null keys without crashing'() {
+        given: 'a test consumer'
+        def uniqueId = UUID.randomUUID().toString().take(8)
+        def consumer = consumerFactory.createConsumer("null-key-group-$uniqueId", "null-key-client-$uniqueId")
+
+        def partitions = (0..2).collect { new TopicPartition(sinkTopic, it) }
+        consumer.assign(partitions)
+        consumer.seekToEnd(partitions)
+        consumer.poll(Duration.ofMillis(100))
+
+        and: 'records with a mix of null and non-null keys'
+        def clientId = 3001L
+        def baseTime = System.currentTimeMillis()
+
+        def validRecord1 = buildRecord(clientId, 'CREATE', baseTime)
+        def validRecord2 = buildRecord(clientId, 'UPDATE', baseTime + 1000)
+        def validRecord3 = buildRecord(clientId, 'DELETE', baseTime + 2000)
+
+        when: 'records are produced including some with null keys'
+        kafkaTemplate.send(sourceTopic, clientId, validRecord1).get()
+        kafkaTemplate.send(sourceTopic, null, validRecord2).get() // Null key - should be skipped
+        kafkaTemplate.send(sourceTopic, clientId, validRecord3).get()
+        kafkaTemplate.send(sourceTopic, null, buildRecord(9999L, 'CREATE', baseTime)).get() // Another null key
+
+        and: 'records are consumed from resequenced topic'
+        // Wait for only the valid records (2), not the null-keyed ones
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 2)
+        consumer.close()
+
+        then: 'only records with valid keys are processed'
+        records.count() == 2
+
+        and: 'records are in correct order'
+        def orderedRecords = records.toList().collect { it.value() as SampleRecord }
+        orderedRecords[0].operationType == 'CREATE'
+        orderedRecords[1].operationType == 'DELETE'
+
+        and: 'the null-keyed UPDATE was skipped'
+        !orderedRecords.any { it.operationType == 'UPDATE' }
+    }
+
+    def 'should handle tombstone records (null values) without crashing'() {
+        given: 'a test consumer'
+        def uniqueId = UUID.randomUUID().toString().take(8)
+        def consumer = consumerFactory.createConsumer("tombstone-group-$uniqueId", "tombstone-client-$uniqueId")
+
+        def partitions = (0..2).collect { new TopicPartition(sinkTopic, it) }
+        consumer.assign(partitions)
+        consumer.seekToEnd(partitions)
+        consumer.poll(Duration.ofMillis(100))
+
+        and: 'records with a mix of normal records and tombstones'
+        def clientId = 4001L
+        def baseTime = System.currentTimeMillis()
+
+        def create = buildRecord(clientId, 'CREATE', baseTime)
+        def update = buildRecord(clientId, 'UPDATE', baseTime + 1000)
+        def delete = buildRecord(clientId, 'DELETE', baseTime + 2000)
+
+        when: 'records are produced including tombstones (null values)'
+        kafkaTemplate.send(sourceTopic, clientId, delete).get()
+        kafkaTemplate.send(sourceTopic, clientId, null).get() // Tombstone - null value
+        kafkaTemplate.send(sourceTopic, clientId, update).get()
+        kafkaTemplate.send(sourceTopic, clientId, create).get()
+        kafkaTemplate.send(sourceTopic, clientId, null).get() // Another tombstone
+
+        and: 'records are consumed from resequenced topic'
+        // All 5 records should be forwarded (including tombstones)
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 5)
+        consumer.close()
+
+        then: 'all records are received including tombstones'
+        records.count() == 5
+
+        and: 'extract all values in order'
+        def allValues = records.toList().collect { it.value() as SampleRecord }
+
+        and: 'non-null records are in correct logical order first'
+        def nonNullRecords = allValues.findAll { it != null }
+        nonNullRecords.size() == 3
+        nonNullRecords[0].operationType == 'CREATE'
+        nonNullRecords[1].operationType == 'UPDATE'
+        nonNullRecords[2].operationType == 'DELETE'
+
+        and: 'tombstones are sorted to the end'
+        def nullRecords = allValues.findAll { it == null }
+        nullRecords.size() == 2
+        // Last two records should be tombstones
+        allValues[-1] == null
+        allValues[-2] == null
+    }
+
     private static SampleRecord buildRecord(Long clientId, String operationType, Long timestamp) {
         SampleRecord.builder()
                 .clientId(clientId)
