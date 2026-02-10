@@ -32,18 +32,10 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
             return 0;
         }
         if (r1 == null) {
-            return switch (tombstoneSortOrder) {
-                case LAST -> 1; // r1 is greater (sorts after)
-                case EQUAL -> 0;
-                case FIRST -> -1; // r1 is less (sorts before)
-            };
+            return tombstoneSortOrder.getSignum();
         }
         if (r2 == null) {
-            return switch (tombstoneSortOrder) {
-                case LAST -> -1; // r2 is greater (sorts after)
-                case EQUAL -> 0;
-                case FIRST -> 1; // r2 is less (sorts before)
-            };
+            return -tombstoneSortOrder.getSignum();
         }
 
         // 1. Operation Type

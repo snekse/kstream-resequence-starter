@@ -1,7 +1,17 @@
 package com.example.sampleapp.config;
 
 public enum TombstoneSortOrder {
-    FIRST,
-    EQUAL,
-    LAST
+    FIRST(-1),
+    EQUAL(0),
+    LAST(1);
+
+    private final int signum;
+
+    TombstoneSortOrder(int signum) {
+        this.signum = signum;
+    }
+
+    public int getSignum() {
+        return signum;
+    }
 }
