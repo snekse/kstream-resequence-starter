@@ -1,6 +1,7 @@
 package com.example.sampleapp.config;
 
 import com.example.sampleapp.domain.BufferedRecord;
+import com.example.sampleapp.domain.ResequenceComparator;
 import com.example.sampleapp.domain.SampleRecord;
 import com.example.sampleapp.processor.ResequenceProcessor;
 import com.example.sampleapp.serde.BufferedRecordListSerde;
@@ -10,6 +11,7 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.Stores;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
@@ -20,6 +22,7 @@ import java.util.List;
 
 @Configuration
 @EnableKafkaStreams
+@EnableConfigurationProperties(ResequenceProperties.class)
 public class ResequenceTopologyConfig {
 
     @Bean
@@ -33,15 +36,21 @@ public class ResequenceTopologyConfig {
     }
 
     @Bean
+    public Comparator<BufferedRecord<SampleRecord>> resequenceComparator(ResequenceProperties properties) {
+        return new ResequenceComparator(properties.getTombstoneSortOrder());
+    }
+
+    @Bean
     public Topology resequencingTopology(
             @Value("${app.pipeline.source.topic}") String sourceTopic,
             @Value("${app.pipeline.sink.topic}") String sinkTopic,
-            @Value("${resequence.state-store-name}") String stateStoreName,
+            ResequenceProperties resequenceProperties,
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
             Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
             Comparator<BufferedRecord<SampleRecord>> resequenceComparator) {
 
+        String stateStoreName = resequenceProperties.getStateStoreName();
         Topology topology = builder.build();
 
         // Add state store
@@ -56,9 +65,9 @@ public class ResequenceTopologyConfig {
                 sampleRecordSerde.deserializer(),
                 sourceTopic);
 
-        // Add processor with injected comparator and state store name
+        // Add processor with injected comparator, state store name, and flush interval
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor(resequenceComparator, stateStoreName),
+                () -> new ResequenceProcessor(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval()),
                 "source");
 
         // Connect state store to processor

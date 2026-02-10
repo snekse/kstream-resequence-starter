@@ -18,6 +18,8 @@ app:
 
 resequence:
   state-store-name: resequence-buffer
+  flush-interval: 2s
+  tombstone-sort-order: LAST
 
 logging:
   level:

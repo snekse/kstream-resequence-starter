@@ -1,10 +1,11 @@
 package com.example.sampleapp.domain
 
+import com.example.sampleapp.config.TombstoneSortOrder
 import spock.lang.Specification
 
 class ResequenceComparatorSpec extends Specification {
 
-    def comparator = new ResequenceComparator()
+    def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
 
     def 'should order by operation type: CREATE < UPDATE < DELETE'() {
         given: 'records with different operation types but same timestamps'
