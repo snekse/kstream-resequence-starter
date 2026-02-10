@@ -22,6 +22,17 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
         SampleRecord r1 = o1.getRecord();
         SampleRecord r2 = o2.getRecord();
 
+        // Handle null records (tombstones) - sort them to the end
+        if (r1 == null && r2 == null) {
+            return 0;
+        }
+        if (r1 == null) {
+            return 1; // r1 is greater (sorts after)
+        }
+        if (r2 == null) {
+            return -1; // r2 is greater (sorts after)
+        }
+
         // 1. Operation Type
         int op1 = OPERATION_ORDER.getOrDefault(r1.getOperationType(), Integer.MAX_VALUE);
         int op2 = OPERATION_ORDER.getOrDefault(r2.getOperationType(), Integer.MAX_VALUE);

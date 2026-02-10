@@ -41,6 +41,11 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         Long key = record.key();
         SampleRecord value = record.value();
 
+        // Skip records with null keys to avoid NPE in state store operations
+        if (key == null) {
+            return;
+        }
+
         // Wrap with Kafka metadata for proper ordering
         BufferedRecord<SampleRecord> buffered = BufferedRecord.<SampleRecord>builder()
                 .record(value)
