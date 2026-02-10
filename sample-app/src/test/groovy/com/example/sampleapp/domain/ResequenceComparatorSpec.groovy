@@ -75,6 +75,74 @@ class ResequenceComparatorSpec extends Specification {
         records[2].partition == 2
     }
 
+    def 'should handle null records (tombstones) by sorting them to the end'() {
+        given: 'records with some null values (tombstones)'
+        def baseTimestamp = System.currentTimeMillis()
+        def create = bufferedRecord('CREATE', baseTimestamp, 0, 0, baseTimestamp)
+        def update = bufferedRecord('UPDATE', baseTimestamp, 0, 1, baseTimestamp)
+        def tombstone1 = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(2)
+                .timestamp(baseTimestamp)
+                .build()
+        def tombstone2 = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(3)
+                .timestamp(baseTimestamp)
+                .build()
+
+        when: 'sorted using the comparator'
+        def records = [tombstone1, update, tombstone2, create]
+        records.sort(comparator)
+
+        then: 'non-null records come first, tombstones are at the end'
+        records[0].record.operationType == 'CREATE'
+        records[1].record.operationType == 'UPDATE'
+        records[2].record == null
+        records[3].record == null
+    }
+
+    def 'should compare two null records as equal'() {
+        given: 'two tombstone records'
+        def tombstone1 = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(0)
+                .timestamp(1000L)
+                .build()
+        def tombstone2 = BufferedRecord.builder()
+                .record(null)
+                .partition(1)
+                .offset(1)
+                .timestamp(2000L)
+                .build()
+
+        when: 'comparing them'
+        def result = comparator.compare(tombstone1, tombstone2)
+
+        then: 'they are considered equal'
+        result == 0
+    }
+
+    def 'should sort null record after non-null record'() {
+        given: 'one tombstone and one normal record'
+        def normalRecord = bufferedRecord('UPDATE', 1000L, 0, 0, 1000L)
+        def tombstone = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(1)
+                .timestamp(500L)
+                .build()
+
+        expect: 'tombstone is greater than normal record'
+        comparator.compare(tombstone, normalRecord) > 0
+
+        and: 'normal record is less than tombstone'
+        comparator.compare(normalRecord, tombstone) < 0
+    }
+
     def 'should handle complex scenario with multiple ordering criteria'() {
         given: 'a mix of records exercising all ordering rules'
         def baseTime = 1000000L
