@@ -1,11 +1,10 @@
 package com.example.sampleapp.domain;
 
-import org.springframework.stereotype.Component;
+import com.example.sampleapp.config.TombstoneSortOrder;
 
 import java.util.Comparator;
 import java.util.Map;
 
-@Component
 public class ResequenceComparator implements Comparator<BufferedRecord<SampleRecord>> {
 
     // Define order: CREATE (0) < UPDATE (1) < DELETE (2)
@@ -17,24 +16,34 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
             "UPDATE", 1,
             "DELETE", 2);
 
+    private final TombstoneSortOrder tombstoneSortOrder;
+
+    public ResequenceComparator(TombstoneSortOrder tombstoneSortOrder) {
+        this.tombstoneSortOrder = tombstoneSortOrder;
+    }
+
     @Override
     public int compare(BufferedRecord<SampleRecord> o1, BufferedRecord<SampleRecord> o2) {
         SampleRecord r1 = o1.getRecord();
         SampleRecord r2 = o2.getRecord();
 
-        // TODO: Make tombstone sorting behavior configurable
-        // Default: sort to end (current behavior)
-        // Option: compare as equal to other record (return 0)
-        // Option: sort to beginning (return -1 for r1 null, 1 for r2 null)
-        // Handle null records (tombstones) - sort them to the end
+        // Handle null records (tombstones) based on configuration
         if (r1 == null && r2 == null) {
             return 0;
         }
         if (r1 == null) {
-            return 1; // r1 is greater (sorts after)
+            return switch (tombstoneSortOrder) {
+                case LAST -> 1; // r1 is greater (sorts after)
+                case EQUAL -> 0;
+                case FIRST -> -1; // r1 is less (sorts before)
+            };
         }
         if (r2 == null) {
-            return -1; // r2 is greater (sorts after)
+            return switch (tombstoneSortOrder) {
+                case LAST -> -1; // r2 is greater (sorts after)
+                case EQUAL -> 0;
+                case FIRST -> 1; // r2 is less (sorts before)
+            };
         }
 
         // 1. Operation Type

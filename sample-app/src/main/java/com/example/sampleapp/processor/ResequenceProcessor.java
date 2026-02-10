@@ -19,11 +19,13 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
 
     private final Comparator<BufferedRecord<SampleRecord>> comparator;
     private final String stateStoreName;
+    private final Duration flushInterval;
     private KeyValueStore<Long, List<BufferedRecord<SampleRecord>>> store;
 
-    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator, String stateStoreName) {
+    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator, String stateStoreName, Duration flushInterval) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
+        this.flushInterval = flushInterval;
     }
 
     @Override
@@ -31,9 +33,8 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         super.init(context);
         this.store = context.getStateStore(stateStoreName);
 
-        // Schedule punctuator to flush buffered records every 2 secs (wall-clock time)
-        // TODO: Make duration configurable in application yml
-        context.schedule(Duration.ofSeconds(2), PunctuationType.WALL_CLOCK_TIME, this::flushAll);
+        // Schedule punctuator to flush buffered records at configured interval (wall-clock time)
+        context.schedule(flushInterval, PunctuationType.WALL_CLOCK_TIME, this::flushAll);
     }
 
     @Override
