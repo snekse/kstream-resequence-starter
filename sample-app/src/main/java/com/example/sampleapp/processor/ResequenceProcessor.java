@@ -31,7 +31,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         super.init(context);
         this.store = context.getStateStore(stateStoreName);
 
-        // Schedule punctuator to flush buffered records every 2 seconds (wall-clock time)
+        // Schedule punctuator to flush buffered records every 2 secs (wall-clock time)
         // TODO: Make duration configurable in application yml
         context.schedule(Duration.ofSeconds(2), PunctuationType.WALL_CLOCK_TIME, this::flushAll);
     }
@@ -69,15 +69,18 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
                     // Sort using the injected comparator
                     records.sort(comparator);
 
-                    // TODO: Re-keying should be optional and if wanted, a mapping function should be provided
-                    // TODO: Should support non-String keys. When doing so,
-                    //       we might need to switch to needing a mapping service provided.
+                    // TODO: Re-keying should be optional and if wanted,
+                    // a mapping function should be provided
+                    // TODO: Should support non-String keys.
+                    // When doing so, we might need to switch to needing a mapping service provided.
                     // Forward each record
                     String newKey = key + "-sorted";
                     for (BufferedRecord<SampleRecord> br : records) {
                         // TODO: An optional Value mapper should be providable the type can be mapped.
                         SampleRecord r = br.getRecord();
-                        r.setNewKey(newKey);
+                        if (r != null) {
+                            r.setNewKey(newKey);
+                        }
                         context().forward(new Record<>(newKey, r, timestamp));
                     }
 
