@@ -1,7 +1,6 @@
 package com.example.sampleapp.processor;
 
 import com.example.sampleapp.domain.BufferedRecord;
-import com.example.sampleapp.domain.SampleRecord;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
@@ -14,22 +13,32 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 
-public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord, String, SampleRecord> {
+public class ResequenceProcessor<K, V, KR> extends ContextualProcessor<K, V, KR, V> {
 
-    private final Comparator<BufferedRecord<SampleRecord>> comparator;
+    private final Comparator<BufferedRecord<V>> comparator;
     private final String stateStoreName;
     private final Duration flushInterval;
-    private KeyValueStore<Long, List<BufferedRecord<SampleRecord>>> store;
+    private final KeyMapper<K, KR> keyMapper;
+    private final BiConsumer<KR, V> valueEnricher;
+    private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
-    public ResequenceProcessor(Comparator<BufferedRecord<SampleRecord>> comparator, String stateStoreName, Duration flushInterval) {
+    public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval) {
+        this(comparator, stateStoreName, flushInterval, null, null);
+    }
+
+    public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval,
+                               KeyMapper<K, KR> keyMapper, BiConsumer<KR, V> valueEnricher) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
+        this.keyMapper = keyMapper;
+        this.valueEnricher = valueEnricher;
     }
 
     @Override
-    public void init(ProcessorContext<String, SampleRecord> context) {
+    public void init(ProcessorContext<KR, V> context) {
         super.init(context);
         this.store = context.getStateStore(stateStoreName);
 
@@ -38,9 +47,9 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
     }
 
     @Override
-    public void process(Record<Long, SampleRecord> record) {
-        Long key = record.key();
-        SampleRecord value = record.value();
+    public void process(Record<K, V> record) {
+        K key = record.key();
+        V value = record.value();
 
         // Skip records with null keys to avoid NPE in state store operations
         if (key == null) {
@@ -48,7 +57,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         }
 
         // Wrap with Kafka metadata for proper ordering
-        BufferedRecord<SampleRecord> buffered = BufferedRecord.<SampleRecord>builder()
+        BufferedRecord<V> buffered = BufferedRecord.<V>builder()
                 .record(value)
                 .partition(context().recordMetadata().map(RecordMetadata::partition).orElse(-1))
                 .offset(context().recordMetadata().map(RecordMetadata::offset).orElse(-1L))
@@ -56,7 +65,7 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
                 .build();
 
         // Get or create list for this key
-        List<BufferedRecord<SampleRecord>> records = store.get(key);
+        List<BufferedRecord<V>> records = store.get(key);
         if (records == null) {
             records = new ArrayList<>();
         }
@@ -64,30 +73,28 @@ public class ResequenceProcessor extends ContextualProcessor<Long, SampleRecord,
         store.put(key, records);
     }
 
+    @SuppressWarnings("unchecked")
     private void flushAll(long timestamp) {
-        try (KeyValueIterator<Long, List<BufferedRecord<SampleRecord>>> iter = store.all()) {
+        try (KeyValueIterator<K, List<BufferedRecord<V>>> iter = store.all()) {
             while (iter.hasNext()) {
                 var entry = iter.next();
-                Long key = entry.key;
-                List<BufferedRecord<SampleRecord>> records = entry.value;
+                K key = entry.key;
+                List<BufferedRecord<V>> records = entry.value;
 
                 if (records != null && !records.isEmpty()) {
                     // Sort using the injected comparator
                     records.sort(comparator);
 
-                    // TODO: Re-keying should be optional and if wanted,
-                    // a mapping function should be provided
-                    // TODO: Should support non-String keys.
-                    // When doing so, we might need to switch to needing a mapping service provided.
+                    // Map the key using the provided key mapper, or pass through unchanged
+                    KR outputKey = keyMapper != null ? keyMapper.map(key) : (KR) key;
+
                     // Forward each record
-                    String newKey = key + "-sorted";
-                    for (BufferedRecord<SampleRecord> br : records) {
-                        // TODO: An optional Value mapper should be providable the type can be mapped.
-                        SampleRecord r = br.getRecord();
-                        if (r != null) {
-                            r.setNewKey(newKey);
+                    for (BufferedRecord<V> br : records) {
+                        V r = br.getRecord();
+                        if (valueEnricher != null && r != null) {
+                            valueEnricher.accept(outputKey, r);
                         }
-                        context().forward(new Record<>(newKey, r, timestamp));
+                        context().forward(new Record<>(outputKey, r, timestamp));
                     }
 
                     // Clear the buffer for this key

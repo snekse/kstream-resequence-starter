@@ -15,6 +15,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.kafka:spring-kafka-test")
+    testImplementation("org.apache.kafka:kafka-streams-test-utils")
     testImplementation("org.spockframework:spock-core:2.4-groovy-5.0")
     testImplementation("org.spockframework:spock-spring:2.4-groovy-5.0")
 }
