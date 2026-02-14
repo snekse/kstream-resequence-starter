@@ -3,6 +3,7 @@ package com.example.sampleapp.config;
 import com.example.sampleapp.domain.BufferedRecord;
 import com.example.sampleapp.domain.ResequenceComparator;
 import com.example.sampleapp.domain.SampleRecord;
+import com.example.sampleapp.processor.KeyMapper;
 import com.example.sampleapp.processor.ResequenceProcessor;
 import com.example.sampleapp.serde.BufferedRecordListSerde;
 import org.apache.kafka.common.serialization.Serde;
@@ -19,6 +20,7 @@ import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 @Configuration
 @EnableKafkaStreams
@@ -65,9 +67,14 @@ public class ResequenceTopologyConfig {
                 sampleRecordSerde.deserializer(),
                 sourceTopic);
 
+        // Re-key from Long to String with "-sorted" suffix
+        KeyMapper<Long, String> keyMapper = key -> key + "-sorted";
+        // Enrich each record's newKey field with the mapped output key
+        BiConsumer<String, SampleRecord> valueEnricher = (newKey, record) -> record.setNewKey(newKey);
+
         // Add processor with injected comparator, state store name, and flush interval
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval()),
+                () -> new ResequenceProcessor<>(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval(), keyMapper, valueEnricher),
                 "source");
 
         // Connect state store to processor
