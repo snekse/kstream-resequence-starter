@@ -1,4 +1,5 @@
 plugins {
+    `java-library`
     id("io.freefair.lombok") version "9.1.0"
 }
 
