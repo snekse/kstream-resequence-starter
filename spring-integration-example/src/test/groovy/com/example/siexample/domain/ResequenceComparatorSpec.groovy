@@ -1,4 +1,4 @@
-package com.example.sampleapp.domain
+package com.example.siexample.domain
 
 import com.example.sampledomain.BufferedRecord
 import com.example.sampledomain.EntityType
@@ -152,22 +152,13 @@ class ResequenceComparatorSpec extends Specification {
         given: 'a mix of records exercising all ordering rules'
         def baseTime = 1000000L
 
-        // CREATE should come first regardless of timestamps
         def create = bufferedRecord('CREATE', baseTime + 5000, 0, 100, baseTime + 5000)
-
-        // Two UPDATEs with different payload timestamps
         def updateEarly = bufferedRecord('UPDATE', baseTime + 1000, 0, 10, baseTime + 1000)
         def updateLate = bufferedRecord('UPDATE', baseTime + 2000, 0, 20, baseTime + 2000)
-
-        // Two UPDATEs with same payload timestamp, same partition - use offset
         def updateSameTime1 = bufferedRecord('UPDATE', baseTime + 3000, 1, 5, baseTime + 3010)
         def updateSameTime2 = bufferedRecord('UPDATE', baseTime + 3000, 1, 15, baseTime + 3005)
-
-        // Two UPDATEs with same payload timestamp, different partitions - use Kafka timestamp
         def updateDiffPartition1 = bufferedRecord('UPDATE', baseTime + 4000, 2, 50, baseTime + 4020)
         def updateDiffPartition2 = bufferedRecord('UPDATE', baseTime + 4000, 3, 60, baseTime + 4010)
-
-        // DELETE should come last
         def delete = bufferedRecord('DELETE', baseTime, 0, 1, baseTime)
 
         when: 'all records are sorted'

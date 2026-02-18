@@ -1,8 +1,8 @@
 package com.example.sampleapp.config;
 
-import com.example.sampleapp.domain.BufferedRecord;
-import com.example.sampleapp.domain.ResequenceComparator;
-import com.example.sampleapp.domain.SampleRecord;
+import com.example.sampledomain.BufferedRecord;
+import com.example.sampledomain.ResequenceComparator;
+import com.example.sampledomain.SampleRecord;
 import com.example.sampleapp.processor.KeyMapper;
 import com.example.sampleapp.processor.ResequenceProcessor;
 import com.example.sampleapp.serde.BufferedRecordListSerde;

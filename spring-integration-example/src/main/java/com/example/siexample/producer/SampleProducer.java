@@ -1,4 +1,4 @@
-package com.example.sampleapp.producer;
+package com.example.siexample.producer;
 
 import com.example.sampledomain.EntityType;
 import com.example.sampledomain.SampleRecord;
@@ -33,7 +33,7 @@ public class SampleProducer {
         log.info("Producing {} records out of order...", records.size());
         records.forEach(record -> {
             log.info("Sending record: {}", record);
-            kafkaTemplate.send(topic, record.getClientId(), record);
+            kafkaTemplate.send(topic, String.valueOf(record.getClientId()), record);
         });
     }
 

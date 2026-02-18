@@ -1,4 +1,4 @@
-package com.example.sampleapp.config;
+package com.example.sampledomain;
 
 public enum TombstoneSortOrder {
     FIRST(-1),

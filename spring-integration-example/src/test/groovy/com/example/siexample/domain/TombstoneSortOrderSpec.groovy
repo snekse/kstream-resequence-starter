@@ -1,4 +1,4 @@
-package com.example.sampleapp.domain
+package com.example.siexample.domain
 
 import com.example.sampledomain.BufferedRecord
 import com.example.sampledomain.EntityType

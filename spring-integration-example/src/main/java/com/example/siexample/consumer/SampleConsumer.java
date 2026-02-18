@@ -1,4 +1,4 @@
-package com.example.sampleapp.consumer;
+package com.example.siexample.consumer;
 
 import com.example.sampledomain.SampleRecord;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SampleConsumer {
 
-    @KafkaListener(topics = "${app.pipeline.sink.topic:sample-topic-resequenced}", groupId = "sample-group")
+    @KafkaListener(topics = "${app.pipeline.sink.topic:sample-topic-resequenced}", groupId = "si-example-group")
     public void consume(SampleRecord record,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset) {

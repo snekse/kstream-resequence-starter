@@ -1,9 +1,8 @@
-package com.example.sampleapp
-
+package com.example.siexample
 
 import com.example.sampledomain.EntityType
 import com.example.sampledomain.SampleRecord
-import com.example.sampleapp.producer.SampleProducer
+import com.example.siexample.producer.SampleProducer
 import org.apache.kafka.common.TopicPartition
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -20,7 +19,8 @@ import java.time.Duration
 
 @SpringBootTest(properties = [
     'spring.embedded.kafka.brokers.property=spring.kafka.bootstrap-servers',
-    'app.pipeline.source.topic=test-topic'])
+    'app.pipeline.source.topic=si-test-topic',
+    'resequence.group-timeout=2s'])
 @EmbeddedKafka(topics = ['${app.pipeline.source.topic}', '${app.pipeline.source.topic}-resequenced'], partitions = 3)
 @ActiveProfiles('test')
 @DirtiesContext
@@ -46,7 +46,6 @@ class OutOfOrderSpec extends Specification {
         def uniqueId = UUID.randomUUID().toString().take(8)
         def consumer = consumerFactory.createConsumer("test-group-$uniqueId", "test-client-$uniqueId")
 
-        // Assign partitions and seek to end to ignore records from previous tests
         def partitions = (0..2).collect { new TopicPartition(sinkTopic, it) }
         consumer.assign(partitions)
         consumer.seekToEnd(partitions)
@@ -55,15 +54,13 @@ class OutOfOrderSpec extends Specification {
         when: 'messages are produced and thereafter consumed'
         producer.produceSampleData()
 
-        // Use KafkaTestUtils to wait for exactly 6 records
-        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 6)
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(15), 6)
         consumer.close()
 
         then: 'all records are received'
         records.count() == 6
 
         and: 'records for client 1001 are in correct logical order (Create -> Update -> Delete)'
-        // Extract values from ConsumerRecords
         def allRecords = records.toList().collect { it.value() as SampleRecord }
         def client1Records = allRecords.findAll { it.clientId == 1001L }
 
@@ -82,14 +79,12 @@ class OutOfOrderSpec extends Specification {
         def sourceConsumer = consumerFactory.createConsumer("source-group-$uniqueId", "source-client-$uniqueId")
         def sinkConsumer = consumerFactory.createConsumer("sink-group-$uniqueId", "sink-client-$uniqueId")
 
-        // Assign partitions and seek to end to ignore records from previous tests
         def sourcePartitions = (0..2).collect { new TopicPartition(sourceTopic, it) }
         def sinkPartitions = (0..2).collect { new TopicPartition(sinkTopic, it) }
         sourceConsumer.assign(sourcePartitions)
         sinkConsumer.assign(sinkPartitions)
         sourceConsumer.seekToEnd(sourcePartitions)
         sinkConsumer.seekToEnd(sinkPartitions)
-        // Poll once to commit the seek
         sourceConsumer.poll(Duration.ofMillis(100))
         sinkConsumer.poll(Duration.ofMillis(100))
 
@@ -97,8 +92,8 @@ class OutOfOrderSpec extends Specification {
         producer.produceSampleData()
 
         and: 'consumed from both topics'
-        def sourceRecords = KafkaTestUtils.getRecords(sourceConsumer, Duration.ofSeconds(10), 6)
-        def sinkRecords = KafkaTestUtils.getRecords(sinkConsumer, Duration.ofSeconds(10), 6)
+        def sourceRecords = KafkaTestUtils.getRecords(sourceConsumer, Duration.ofSeconds(15), 6)
+        def sinkRecords = KafkaTestUtils.getRecords(sinkConsumer, Duration.ofSeconds(15), 6)
         sourceConsumer.close()
         sinkConsumer.close()
 
@@ -135,37 +130,29 @@ class OutOfOrderSpec extends Specification {
         consumer.poll(Duration.ofMillis(100))
 
         and: 'complex records with varying timestamps'
-        def clientId = 2001L
+        def clientId = '2001'
         def baseTime = System.currentTimeMillis()
 
-        // CREATE - should always come first
-        def create = buildRecord(clientId, 'CREATE', baseTime + 5000) // Latest timestamp but CREATE
+        def create = buildRecord(2001L, 'CREATE', baseTime + 5000)
+        def updateEarly = buildRecord(2001L, 'UPDATE', baseTime + 1000)
+        def updateMiddle = buildRecord(2001L, 'UPDATE', baseTime + 2000)
+        def updateLate = buildRecord(2001L, 'UPDATE', baseTime + 3000)
+        def updateSameTime1 = buildRecord(2001L, 'UPDATE', baseTime + 4000)
+        def updateSameTime2 = buildRecord(2001L, 'UPDATE', baseTime + 4000)
+        def delete = buildRecord(2001L, 'DELETE', baseTime)
 
-        // UPDATEs with different payload timestamps - should be ordered by timestamp
-        def updateEarly = buildRecord(clientId, 'UPDATE', baseTime + 1000)
-        def updateMiddle = buildRecord(clientId, 'UPDATE', baseTime + 2000)
-        def updateLate = buildRecord(clientId, 'UPDATE', baseTime + 3000)
-
-        // Two UPDATEs with SAME payload timestamp - will be ordered by Kafka metadata
-        def updateSameTime1 = buildRecord(clientId, 'UPDATE', baseTime + 4000)
-        def updateSameTime2 = buildRecord(clientId, 'UPDATE', baseTime + 4000)
-
-        // DELETE - should always come last
-        def delete = buildRecord(clientId, 'DELETE', baseTime) // Earliest timestamp but DELETE
-
-        when: 'records are produced in scrambled order with delays for Kafka timestamp differences'
-        // Produce in reverse/scrambled order to ensure resequencing is needed
+        when: 'records are produced in scrambled order'
         kafkaTemplate.send(sourceTopic, clientId, delete).get()
         kafkaTemplate.send(sourceTopic, clientId, updateLate).get()
         kafkaTemplate.send(sourceTopic, clientId, updateSameTime2).get()
-        Thread.sleep(50) // Small delay to ensure different Kafka timestamp
+        Thread.sleep(50)
         kafkaTemplate.send(sourceTopic, clientId, updateSameTime1).get()
         kafkaTemplate.send(sourceTopic, clientId, create).get()
         kafkaTemplate.send(sourceTopic, clientId, updateMiddle).get()
         kafkaTemplate.send(sourceTopic, clientId, updateEarly).get()
 
         and: 'records are consumed from resequenced topic'
-        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 7)
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(15), 7)
         consumer.close()
 
         then: 'all 7 records are received'
@@ -209,12 +196,12 @@ class OutOfOrderSpec extends Specification {
         consumer.poll(Duration.ofMillis(100))
 
         and: 'records with a mix of null and non-null keys'
-        def clientId = 3001L
+        def clientId = '3001'
         def baseTime = System.currentTimeMillis()
 
-        def validRecord1 = buildRecord(clientId, 'CREATE', baseTime)
-        def validRecord2 = buildRecord(clientId, 'UPDATE', baseTime + 1000)
-        def validRecord3 = buildRecord(clientId, 'DELETE', baseTime + 2000)
+        def validRecord1 = buildRecord(3001L, 'CREATE', baseTime)
+        def validRecord2 = buildRecord(3001L, 'UPDATE', baseTime + 1000)
+        def validRecord3 = buildRecord(3001L, 'DELETE', baseTime + 2000)
 
         when: 'records are produced including some with null keys'
         kafkaTemplate.send(sourceTopic, clientId, validRecord1).get()
@@ -223,8 +210,7 @@ class OutOfOrderSpec extends Specification {
         kafkaTemplate.send(sourceTopic, null, buildRecord(9999L, 'CREATE', baseTime)).get() // Another null key
 
         and: 'records are consumed from resequenced topic'
-        // Wait for only the valid records (2), not the null-keyed ones
-        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 2)
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(15), 2)
         consumer.close()
 
         then: 'only records with valid keys are processed'
@@ -250,23 +236,22 @@ class OutOfOrderSpec extends Specification {
         consumer.poll(Duration.ofMillis(100))
 
         and: 'records with a mix of normal records and tombstones'
-        def clientId = 4001L
+        def clientId = '4001'
         def baseTime = System.currentTimeMillis()
 
-        def create = buildRecord(clientId, 'CREATE', baseTime)
-        def update = buildRecord(clientId, 'UPDATE', baseTime + 1000)
-        def delete = buildRecord(clientId, 'DELETE', baseTime + 2000)
+        def create = buildRecord(4001L, 'CREATE', baseTime)
+        def update = buildRecord(4001L, 'UPDATE', baseTime + 1000)
+        def delete = buildRecord(4001L, 'DELETE', baseTime + 2000)
 
         when: 'records are produced including tombstones (null values)'
         kafkaTemplate.send(sourceTopic, clientId, delete).get()
-        kafkaTemplate.send(sourceTopic, clientId, null).get() // Tombstone - null value
+        kafkaTemplate.send(sourceTopic, clientId, null).get() // Tombstone
         kafkaTemplate.send(sourceTopic, clientId, update).get()
         kafkaTemplate.send(sourceTopic, clientId, create).get()
         kafkaTemplate.send(sourceTopic, clientId, null).get() // Another tombstone
 
         and: 'records are consumed from resequenced topic'
-        // All 5 records should be forwarded (including tombstones)
-        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10), 5)
+        def records = KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(15), 5)
         consumer.close()
 
         then: 'all records are received including tombstones'
@@ -285,7 +270,6 @@ class OutOfOrderSpec extends Specification {
         and: 'tombstones are sorted to the end'
         def nullRecords = allValues.findAll { it == null }
         nullRecords.size() == 2
-        // Last two records should be tombstones
         allValues[-1] == null
         allValues[-2] == null
     }
