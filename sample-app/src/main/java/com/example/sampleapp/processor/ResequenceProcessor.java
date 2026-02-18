@@ -1,6 +1,6 @@
 package com.example.sampleapp.processor;
 
-import com.example.sampleapp.domain.BufferedRecord;
+import com.example.sampledomain.BufferedRecord;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;

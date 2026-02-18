@@ -1,5 +1,6 @@
 package com.example.sampleapp.config;
 
+import com.example.sampledomain.TombstoneSortOrder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;

@@ -1,16 +1,10 @@
-package com.example.sampleapp.domain;
-
-import com.example.sampleapp.config.TombstoneSortOrder;
+package com.example.sampledomain;
 
 import java.util.Comparator;
 import java.util.Map;
 
 public class ResequenceComparator implements Comparator<BufferedRecord<SampleRecord>> {
 
-    // Define order: CREATE (0) < UPDATE (1) < DELETE (2)
-    // Note: User prompt said "CREATE > UPDATE > DELETE", but context implies sort
-    // order.
-    // Typically we process Create first. I will assume standard logical order.
     private static final Map<String, Integer> OPERATION_ORDER = Map.of(
             "CREATE", 0,
             "UPDATE", 1,
@@ -45,11 +39,7 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
             return Integer.compare(op1, op2);
         }
 
-        // 2. Timestamp (Payload timestamp prefers, usage depends on exact requirement,
-        // prompt says "use the `timestamp` as the fallback comparison" - usually
-        // referring to payload timestamp if available, or kafka timestamp)
-        // Let's use payload timestamp if available.
-        // The generator creates payload timestamp.
+        // 2. Payload timestamp
         if (r1.getTimestamp() != null && r2.getTimestamp() != null) {
             int timeCompare = r1.getTimestamp().compareTo(r2.getTimestamp());
             if (timeCompare != 0) {
@@ -57,14 +47,11 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
             }
         }
 
-        // 3. Fallback: Kafka Header Details
-        // "if they were on the same partition, then lowest offset is first"
+        // 3. Kafka metadata tiebreaker
         if (o1.getPartition() == o2.getPartition()) {
             return Long.compare(o1.getOffset(), o2.getOffset());
         }
 
-        // "if they were on different partitions, lowest kafka timestamp wins"
-        // Note: Kafka timestamp is captured in BufferedRecord.timestamp
         return Long.compare(o1.getTimestamp(), o2.getTimestamp());
     }
 }

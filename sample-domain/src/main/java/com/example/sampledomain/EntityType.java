@@ -1,4 +1,4 @@
-package com.example.sampleapp.domain;
+package com.example.sampledomain;
 
 public enum EntityType {
     Parent,

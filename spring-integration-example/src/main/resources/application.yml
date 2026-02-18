@@ -1,0 +1,22 @@
+spring:
+  kafka:
+    consumer:
+      group-id: si-example-group
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+app:
+  pipeline:
+    source:
+      topic: sample-topic
+    sink:
+      topic: ${app.pipeline.source.topic}-resequenced
+
+resequence:
+  group-timeout: 2s
+  tombstone-sort-order: LAST
+
+logging:
+  level:
+    com.example.siexample: INFO

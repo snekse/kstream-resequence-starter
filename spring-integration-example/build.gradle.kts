@@ -5,10 +5,11 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":resequence-starter"))
     implementation(project(":sample-domain"))
+    implementation("org.springframework.boot:spring-boot-starter-integration")
     implementation("org.springframework.boot:spring-boot-starter-kafka")
-    implementation("org.apache.kafka:kafka-streams")
+    implementation("org.springframework.integration:spring-integration-kafka")
+    implementation("org.springframework.kafka:spring-kafka")
     implementation("tools.jackson.core:jackson-databind")
 
     compileOnly("org.projectlombok:lombok")
@@ -16,7 +17,6 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.kafka:spring-kafka-test")
-    testImplementation("org.apache.kafka:kafka-streams-test-utils")
     testImplementation("org.spockframework:spock-core:2.4-groovy-5.0")
     testImplementation("org.spockframework:spock-spring:2.4-groovy-5.0")
 }
