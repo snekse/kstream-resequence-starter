@@ -48,7 +48,7 @@ public class EmbeddedKafkaConfig {
         Map<String, Object> props = properties.buildConsumerProperties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
         JacksonJsonDeserializer<SampleRecord> deserializer = new JacksonJsonDeserializer<>(SampleRecord.class);
-        deserializer.addTrustedPackages("com.example.siexample.domain");
+        deserializer.addTrustedPackages("com.example.sampledomain");
         return new DefaultKafkaConsumerFactory(props, null, deserializer);
     }
 
