@@ -8,6 +8,7 @@ import com.example.sampleapp.domain.SampleRecord
 import com.example.sampleapp.serde.BufferedRecordListSerde
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.StreamsConfig
+import tools.jackson.databind.json.JsonMapper
 import org.apache.kafka.streams.TestInputTopic
 import org.apache.kafka.streams.TestOutputTopic
 import org.apache.kafka.streams.Topology
@@ -56,7 +57,7 @@ class ResequenceProcessorSpec extends Specification {
             java.util.function.BiConsumer<KR, SampleRecord> valueEnricher) {
 
         def valueSerde = new JacksonJsonSerde<>(SampleRecord)
-        def bufferedSerde = new BufferedRecordListSerde<>(SampleRecord)
+        def bufferedSerde = new BufferedRecordListSerde<>(SampleRecord, JsonMapper.builder().build())
 
         def topology = new Topology()
         topology.addStateStore(Stores.keyValueStoreBuilder(
