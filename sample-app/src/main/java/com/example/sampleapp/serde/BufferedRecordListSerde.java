@@ -1,6 +1,6 @@
 package com.example.sampleapp.serde;
 
-import com.example.sampledomain.BufferedRecord;
+import com.example.sampleapp.domain.BufferedRecord;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;

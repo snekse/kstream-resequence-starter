@@ -1,7 +1,7 @@
 package com.example.sampleapp.producer;
 
-import com.example.sampledomain.EntityType;
-import com.example.sampledomain.SampleRecord;
+import com.example.sampleapp.domain.EntityType;
+import com.example.sampleapp.domain.SampleRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

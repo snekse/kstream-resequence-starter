@@ -1,10 +1,10 @@
 package com.example.sampleapp.domain
 
-import com.example.sampledomain.BufferedRecord
-import com.example.sampledomain.EntityType
-import com.example.sampledomain.ResequenceComparator
-import com.example.sampledomain.SampleRecord
-import com.example.sampledomain.TombstoneSortOrder
+import com.example.sampleapp.domain.BufferedRecord
+import com.example.sampleapp.domain.EntityType
+import com.example.sampleapp.domain.ResequenceComparator
+import com.example.sampleapp.domain.SampleRecord
+import com.example.sampleapp.domain.TombstoneSortOrder
 import spock.lang.Specification
 
 class TombstoneSortOrderSpec extends Specification {

@@ -1,6 +1,6 @@
 package com.example.sampleapp.consumer;
 
-import com.example.sampledomain.SampleRecord;
+import com.example.sampleapp.domain.SampleRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.KafkaHeaders;
