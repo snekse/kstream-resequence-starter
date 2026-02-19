@@ -1,8 +1,8 @@
 package com.example.sampleapp
 
 
-import com.example.sampledomain.EntityType
-import com.example.sampledomain.SampleRecord
+import com.example.sampleapp.domain.EntityType
+import com.example.sampleapp.domain.SampleRecord
 import com.example.sampleapp.producer.SampleProducer
 import org.apache.kafka.common.TopicPartition
 import org.springframework.beans.factory.annotation.Autowired

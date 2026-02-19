@@ -10,7 +10,7 @@ See [Resequencer Pattern](https://www.enterpriseintegrationpatterns.com/patterns
 
 ---
 
-Beyond the core starter, the project includes two reference implementations comparing **Kafka Streams** vs. **Spring Integration** approaches — demonstrating that the same resequencing result can be achieved with either framework.
+Beyond the core starter, the project also includes a reference implementation.
 
 ## The Problem
 
@@ -29,7 +29,7 @@ The resequencer must handle: null keys (skip), tombstones/null values (configura
 
 ### Ordering Logic
 
-Both implementations share a multi-level comparator that determines the correct message order:
+The multi-level comparator determines the correct message order:
 
 1. **Operation type** — `CREATE (0) < UPDATE (1) < DELETE (2)`. A `CREATE` always comes before an `UPDATE` regardless of timestamps.
 2. **Payload timestamp** — Within the same operation type, earlier timestamps come first.
@@ -53,17 +53,10 @@ Records with null keys are silently skipped — they cannot be grouped by key an
 
 ## Modules
 
-| Module | Approach | Description |
-|--------|----------|-------------|
-| `resequence-starter` | Core library | Resequencing logic and Spring Boot auto-configuration |
-| `sample-app` | Kafka Streams Processor API | Reference implementation using low-level Kafka Streams topology |
-| `spring-integration-example` | Spring Integration Aggregator | Reference implementation using SI's Aggregator component |
+- **`resequence-starter`** — Core library with resequencing logic and Spring Boot auto-configuration
+- **`sample-app`** — Reference implementation demonstrating the starter using the Kafka Streams Processor API
 
-Both `sample-app` and `spring-integration-example` produce identical output for identical input — they differ only in implementation approach.
-
-## Kafka Streams Approach (`sample-app`)
-
-### Architecture
+## Architecture
 
 ```
 Source Topic → [ResequenceProcessor + RocksDB State Store] → Sink Topic
@@ -90,83 +83,33 @@ Source Topic → [ResequenceProcessor + RocksDB State Store] → Sink Topic
 - Requires understanding the low-level Processor API
 - Manual serde management (`BufferedRecordListSerde`)
 
-## Spring Integration Approach (`spring-integration-example`)
+## Design Rationale: Why Kafka Streams over Spring Integration?
 
-### Architecture
+An alternative approach is to use Spring Integration's Aggregator component for resequencing. While viable, Kafka Streams was chosen for this starter because:
 
-```
-Kafka Inbound Adapter → filter(null keys) → transform(wrap in BufferedRecord)
-  → Aggregator(correlate by key, timeout release, sort in output processor)
-  → split(sorted list → individual messages) → Kafka Outbound Handler
-```
+- **Fault-tolerant state out of the box** — Kafka Streams' RocksDB state store is automatically backed by changelog topics. SI's default `SimpleMessageStore` is in-memory and lost on restart; production use requires JDBC/Redis `MessageStore`, adding infrastructure.
+- **Kafka-native** — no additional framework layer between your application and Kafka.
+- **Exactly-once semantics** — available via Kafka Streams transactions.
 
-- Uses Spring Integration's **Aggregator** component — NOT the Resequencer (see below)
-- Inbound Kafka adapter exposes partition, offset, and timestamp as message headers (`KafkaHeaders`)
-- A `.handle()` step filters null keys and wraps each payload in `BufferedRecord`, capturing Kafka metadata from headers
-- The **Aggregator** groups messages by the original Kafka key (via `correlationStrategy`)
-- `groupTimeout` triggers release — functionally equivalent to the Kafka Streams wall-clock punctuator
-- A custom `MessageGroupProcessor` sorts the group using the same `ResequenceComparator`
-- `.split()` breaks the sorted list back into individual messages for the outbound adapter
-
-### Concept Mapping
-
-| Kafka Streams Concept | Spring Integration Equivalent | Notes |
-|----------------------|------------------------------|-------|
-| Record key grouping | `correlationStrategy` | Both group messages by the Kafka record key |
-| Wall-clock punctuator (flush every N seconds) | `groupTimeout` (release after N ms) | Both are wall-clock time-based. SI uses a poller internally, KStreams uses a scheduled callback. Functionally equivalent — "flush what you have after N time" |
-| `Comparator<BufferedRecord<V>>` sorting during flush | `MessageGroupProcessor` sorting during release | Identical comparator logic. SI wraps it in a `MessageGroupProcessor`; KStreams calls it directly in `flushAll()` |
-| `KeyValueStore` (RocksDB, changelog-backed) | `MessageStore` (in-memory default, JDBC/Redis/Mongo optional) | KStreams' state store is fault-tolerant by default. SI's `SimpleMessageStore` is in-memory and lost on restart — production use requires a persistent `MessageStore` |
-| `context().recordMetadata()` (partition, offset) | `KafkaHeaders.RECEIVED_PARTITION`, `KafkaHeaders.OFFSET` | Same metadata, different access pattern. KStreams: via processor context. SI: via message headers |
-| Forward individual records in `flushAll()` | `.split()` after Aggregator | KStreams forwards records one-by-one in a loop. SI's Aggregator emits a single message per group — `.split()` breaks it back into individuals |
-| `KeyMapper<K, KR>` + `BiConsumer<KR, V>` | Header manipulation + enrichment in output processor | Same concept: transform the key, optionally enrich the value |
-| Null key → `return` in `process()` | `.handle()` returning `null` | Both skip records with null keys before buffering |
+Spring Integration's strengths (familiar DSL, transport-agnostic, simpler configuration) make it a good fit if you're already using SI or need multi-protocol support (JMS, AMQP, etc.).
 
 ### Why Aggregator, Not Resequencer?
 
-This is the key insight of this project.
+This is a key insight for anyone considering the Spring Integration approach.
 
 **Spring Integration's [Resequencer](https://docs.spring.io/spring-integration/reference/resequencer.html)** is designed for a specific scenario: an upstream **Splitter** breaks a message into N parts, stamping each with `sequenceNumber` (1, 2, 3...) and `sequenceSize` headers. The Resequencer holds messages until it can release them in sequence order, waiting for gaps to fill.
 
-**Our use case doesn't fit** because:
+**This use case doesn't fit** because:
 
-1. **No pre-existing sequence numbers.** Our ordering is derived from business logic (operation type → payload timestamp → Kafka metadata). Producers don't stamp sequence numbers — the correct order is only known after comparing all buffered messages.
+1. **No pre-existing sequence numbers.** The ordering is derived from business logic (operation type → payload timestamp → Kafka metadata). Producers don't stamp sequence numbers — the correct order is only known after comparing all buffered messages.
 
 2. **Chicken-and-egg problem.** To assign `sequenceNumber` headers, we'd need to sort first. But sorting is exactly what the Resequencer is supposed to do. If we sort first (in a pre-processing step) and then assign sequence numbers, the Resequencer is just a pass-through — it adds no value.
 
-3. **No known sequence size.** The Resequencer works best when `sequenceSize` is known — it can detect completion. In our streaming use case, messages arrive continuously; we don't know how many messages per key will arrive in a given window.
+3. **No known sequence size.** The Resequencer works best when `sequenceSize` is known — it can detect completion. In a streaming use case, messages arrive continuously; we don't know how many messages per key will arrive in a given window.
 
-4. **What about using both (Aggregator → Resequencer)?** Redundant. If the Aggregator's output processor already sorts messages using our comparator, feeding them to a Resequencer with assigned sequence numbers would just pass them through in the same order.
+4. **What about using both (Aggregator → Resequencer)?** Redundant. If the Aggregator's output processor already sorts messages using the comparator, feeding them to a Resequencer with assigned sequence numbers would just pass them through in the same order.
 
-**The Aggregator is the right fit** because it provides:
-- **Custom correlation** — group by any strategy (Kafka key in our case)
-- **Timeout-based release** — release whatever has been buffered after N ms, no sequence numbers needed
-- **Custom output processing** — sort the group using any comparator, transform keys, enrich values
-
-### Strengths
-
-- Familiar Spring Integration DSL and programming model
-- Decoupled from Kafka Streams runtime — could adapt to other message sources (JMS, AMQP, etc.)
-- No custom serde needed — Spring handles serialization
-- Simpler configuration (no topology builder, state store, or serde wiring)
-
-### Limitations
-
-- **In-memory message store by default** — `SimpleMessageStore` is lost on restart. Production use requires JDBC/Redis `MessageStore`, which adds infrastructure. (Kafka Streams' RocksDB store is fault-tolerant out of the box via changelog topics.)
-- **`groupTimeout` precision** — SI uses a poller internally, which may be less precise than Kafka Streams' `PunctuationType.WALL_CLOCK_TIME` scheduler
-- **Tombstone handling** — SI `Message` payloads are typically non-null. Requires wrapping tombstones in `BufferedRecord` (where `record` field is null) and explicit null handling at the outbound stage. Kafka Streams handles null values natively.
-- **Additional framework layer** — adds Spring Integration on top of Kafka, vs. Kafka Streams which is Kafka-native
-
-## When to Use Which
-
-| Scenario | Recommended Approach | Why |
-|----------|---------------------|-----|
-| High-volume Kafka-native pipeline | Kafka Streams (`sample-app`) | RocksDB handles large buffers; changelog-backed fault tolerance; exactly-once semantics |
-| Already using Spring Integration | SI Aggregator (`spring-integration-example`) | Fits naturally into existing SI flows; no need to introduce Kafka Streams |
-| Need fault-tolerant state without extra infrastructure | Kafka Streams | State store backed by changelog topics automatically |
-| Multi-protocol message sources (JMS, AMQP, Kafka) | Spring Integration | Transport-agnostic; swap channel adapters |
-| Need exactly-once processing guarantees | Kafka Streams | Native transaction support |
-| Small buffer sizes, simple deployments | Either | Both work well; choose based on team familiarity |
-| Custom ordering without sequence numbers | Either | Both support pluggable comparators (directly in KStreams, via output processor in SI) |
+The **Aggregator** is the right SI component because it provides custom correlation (group by any strategy), timeout-based release (no sequence numbers needed), and custom output processing (sort using any comparator).
 
 ## Getting Started
 
@@ -177,11 +120,8 @@ This is the key insight of this project.
 # Run all tests
 ./gradlew test
 
-# Run sample-app tests (Kafka Streams approach)
+# Run sample-app tests
 ./gradlew :sample-app:test
-
-# Run spring-integration-example tests (SI approach)
-./gradlew :spring-integration-example:test
 
 # Run sample app
 ./gradlew :sample-app:bootRun
@@ -191,7 +131,7 @@ This is the key insight of this project.
 
 - **Java 21** (enforced via Gradle toolchain)
 - **Spring Boot 4.0.1** with Spring Kafka
-- **Kafka Streams** (sample-app) / **Spring Integration Kafka** (spring-integration-example)
+- **Kafka Streams** Processor API
 - **Gradle** with Kotlin DSL
 - **Testing:** Spock 2.4+ with Groovy 5.x, embedded Kafka via `@EmbeddedKafka`
 

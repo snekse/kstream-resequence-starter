@@ -6,8 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":resequence-starter"))
-    implementation(project(":sample-domain"))
-    implementation("org.springframework.boot:spring-boot-starter-kafka")
+implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.apache.kafka:kafka-streams")
     implementation("tools.jackson.core:jackson-databind")
 
