@@ -41,6 +41,7 @@ public class IntegrationFlowConfig {
     }
 
     @Bean
+    @SuppressWarnings("unchecked")
     public MessageGroupProcessor resequenceOutputProcessor(
             Comparator<BufferedRecord<SampleRecord>> resequenceComparator,
             KeyMapper<String, String> keyMapper,
@@ -50,13 +51,7 @@ public class IntegrationFlowConfig {
 
             // Sort buffered records using comparator
             List<Message<?>> sorted = messages.stream()
-                    .sorted((m1, m2) -> {
-                        @SuppressWarnings("unchecked")
-                        BufferedRecord<SampleRecord> br1 = (BufferedRecord<SampleRecord>) m1.getPayload();
-                        @SuppressWarnings("unchecked")
-                        BufferedRecord<SampleRecord> br2 = (BufferedRecord<SampleRecord>) m2.getPayload();
-                        return resequenceComparator.compare(br1, br2);
-                    })
+                    .sorted(Comparator.comparing(m -> (BufferedRecord<SampleRecord>) m.getPayload(), resequenceComparator))
                     .toList();
 
             // Unwrap BufferedRecords, apply key mapping and value enrichment

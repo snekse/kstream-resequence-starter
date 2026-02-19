@@ -30,3 +30,4 @@ replay_pid*
 
 # Claude Code local settings
 .claude/
+!gradle/wrapper/gradle-wrapper.jar
