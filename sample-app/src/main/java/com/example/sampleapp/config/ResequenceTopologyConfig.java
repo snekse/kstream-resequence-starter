@@ -13,6 +13,7 @@ import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.Stores;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import tools.jackson.databind.json.JsonMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
@@ -20,6 +21,7 @@ import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 @Configuration
@@ -33,8 +35,9 @@ public class ResequenceTopologyConfig {
     }
 
     @Bean
-    public Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde() {
-        return new BufferedRecordListSerde<>(SampleRecord.class);
+    public Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde(JsonMapper objectMapper) {
+        Objects.requireNonNull(objectMapper, "ObjectMapper must not be null");
+        return new BufferedRecordListSerde<>(SampleRecord.class, objectMapper);
     }
 
     @Bean
