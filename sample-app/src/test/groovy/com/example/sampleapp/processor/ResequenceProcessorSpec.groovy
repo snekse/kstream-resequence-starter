@@ -6,6 +6,7 @@ import com.example.sampleapp.domain.EntityType
 import com.example.sampleapp.domain.ResequenceComparator
 import com.example.sampleapp.domain.SampleRecord
 import com.example.sampleapp.serde.BufferedRecordListSerde
+import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.StreamsConfig
 import tools.jackson.databind.json.JsonMapper
@@ -19,7 +20,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 import java.time.Duration
-import java.time.Instant
 
 class ResequenceProcessorSpec extends Specification {
 
@@ -50,11 +50,22 @@ class ResequenceProcessorSpec extends Specification {
     }
 
     private static <K, KR> Topology buildTopology(
-            org.apache.kafka.common.serialization.Serde<K> keySerde,
-            org.apache.kafka.common.serialization.Serde<KR> outputKeySerde,
+            Serde<K> keySerde,
+            Serde<KR> outputKeySerde,
             Comparator<BufferedRecord<SampleRecord>> comparator,
             KeyMapper<K, KR> keyMapper,
-            java.util.function.BiConsumer<KR, SampleRecord> valueEnricher) {
+            ValueMapper<KR, SampleRecord, SampleRecord> valueMapper) {
+
+        buildTopology(keySerde, outputKeySerde, new JacksonJsonSerde<>(SampleRecord), comparator, keyMapper, valueMapper)
+    }
+
+    private static <K, KR, VR> Topology buildTopology(
+            Serde<K> keySerde,
+            Serde<KR> outputKeySerde,
+            Serde<VR> outputValueSerde,
+            Comparator<BufferedRecord<SampleRecord>> comparator,
+            KeyMapper<K, KR> keyMapper,
+            ValueMapper<KR, SampleRecord, VR> valueMapper) {
 
         def valueSerde = new JacksonJsonSerde<>(SampleRecord)
         def bufferedSerde = new BufferedRecordListSerde<>(SampleRecord, JsonMapper.builder().build())
@@ -71,7 +82,7 @@ class ResequenceProcessorSpec extends Specification {
                 SOURCE_TOPIC)
 
         topology.addProcessor('resequencer',
-                () -> new ResequenceProcessor<>(comparator, STATE_STORE, FLUSH_INTERVAL, keyMapper, valueEnricher),
+                () -> new ResequenceProcessor<>(comparator, STATE_STORE, FLUSH_INTERVAL, keyMapper, valueMapper),
                 'source')
 
         topology.connectProcessorAndStateStores('resequencer', STATE_STORE)
@@ -79,7 +90,7 @@ class ResequenceProcessorSpec extends Specification {
         topology.addSink('sink',
                 SINK_TOPIC,
                 outputKeySerde.serializer(),
-                valueSerde.serializer(),
+                outputValueSerde.serializer(),
                 'resequencer')
 
         topology
@@ -213,14 +224,18 @@ class ResequenceProcessorSpec extends Specification {
         results[1].value.operationType == 'UPDATE'
     }
 
-    def 'should invoke value enricher callback when provided'() {
-        given: 'a topology with a value enricher that sets newKey'
+    def 'should apply value mapper to enrich output records using Kafka metadata'() {
+        given: 'a topology with a value mapper that enriches newKey from Kafka metadata'
         def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-enriched' }
-        java.util.function.BiConsumer<String, SampleRecord> enricher = { String newKey, SampleRecord record ->
-            record.setNewKey(newKey)
+        ValueMapper<String, SampleRecord, SampleRecord> valueMapper = { String outputKey, BufferedRecord<SampleRecord> buffered ->
+            def record = buffered.record
+            if (record != null) {
+                record.newKey = "${record.clientId}-enriched"
+            }
+            record
         }
-        def topology = buildTopology(Serdes.Long(), Serdes.String(), comparator, keyMapper, enricher)
+        def topology = buildTopology(Serdes.Long(), Serdes.String(), comparator, keyMapper, valueMapper)
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
@@ -249,8 +264,8 @@ class ResequenceProcessorSpec extends Specification {
         results[1].value == null
     }
 
-    def 'should not invoke value enricher when not provided'() {
-        given: 'a topology without a value enricher'
+    def 'should not invoke value mapper when not provided'() {
+        given: 'a topology without a value mapper'
         def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-mapped' }
         def topology = buildTopology(Serdes.Long(), Serdes.String(), comparator, keyMapper, null)
@@ -272,6 +287,37 @@ class ResequenceProcessorSpec extends Specification {
         results.size() == 1
         results[0].key == '50-mapped'
         results[0].value.newKey == null
+    }
+
+    def 'should transform value to a different output type using value mapper'() {
+        given: 'a topology with a value mapper that extracts operationType as a String'
+        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        ValueMapper<Long, SampleRecord, String> valueMapper = { Long outputKey, BufferedRecord<SampleRecord> buffered ->
+            buffered.record?.operationType
+        }
+        def topology = buildTopology(Serdes.Long(), Serdes.Long(), Serdes.String(), comparator, null, valueMapper)
+        driver = new TopologyTestDriver(topology, driverConfig())
+
+        def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
+                Serdes.Long().serializer(), new JacksonJsonSerde<>(SampleRecord).serializer())
+        def outputTopic = driver.createOutputTopic(SINK_TOPIC,
+                Serdes.Long().deserializer(), Serdes.String().deserializer())
+
+        and: 'out-of-order records'
+        def baseTime = System.currentTimeMillis()
+
+        when: 'records are piped in out of order'
+        inputTopic.pipeInput(1001L, buildRecord(1001L, 'DELETE', baseTime + 2000))
+        inputTopic.pipeInput(1001L, buildRecord(1001L, 'CREATE', baseTime))
+
+        and: 'wall clock advances to trigger flush'
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'output values are Strings containing the operation type in correct order'
+        def results = outputTopic.readKeyValuesToList()
+        results.size() == 2
+        results[0].value == 'CREATE'
+        results[1].value == 'DELETE'
     }
 
     def 'should handle null keys with generic key types'() {
