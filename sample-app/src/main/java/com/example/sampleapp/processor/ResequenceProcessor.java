@@ -20,20 +20,20 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
     private final String stateStoreName;
     private final Duration flushInterval;
     private final KeyMapper<K, KR> keyMapper;
-    private final ValueMapper<V, VR> valueMapper;
+    private final ValueMapper<KR, V, VR> valueMapper;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
     public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, null);
+        this(comparator, stateStoreName, flushInterval, null, ValueMapper.noOp());
     }
 
     public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval,
-                               KeyMapper<K, KR> keyMapper, ValueMapper<V, VR> valueMapper) {
+                               KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
-        this.valueMapper = valueMapper;
+        this.valueMapper = valueMapper != null ? valueMapper : ValueMapper.noOp();
     }
 
     @Override
@@ -87,9 +87,9 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
                     // Map the key using the provided key mapper, or pass through unchanged
                     KR outputKey = keyMapper != null ? keyMapper.map(key) : (KR) key;
 
-                    // Forward each record, applying optional value mapper
+                    // Forward each record, applying the value mapper (noOp by default)
                     for (BufferedRecord<V> br : records) {
-                        VR mappedValue = valueMapper != null ? valueMapper.mapValue(br) : (VR) br.getRecord();
+                        VR mappedValue = valueMapper.mapValue(outputKey, br);
                         context().forward(new Record<>(outputKey, mappedValue, timestamp));
                     }
 

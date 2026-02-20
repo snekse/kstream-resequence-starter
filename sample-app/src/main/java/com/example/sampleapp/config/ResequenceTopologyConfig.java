@@ -73,11 +73,11 @@ public class ResequenceTopologyConfig {
         // Re-key from Long to String with "-sorted" suffix
         KeyMapper<Long, String> keyMapper = key -> key + "-sorted";
 
-        // Enrich each record using Kafka metadata exposed by the ValueMapper
-        ValueMapper<SampleRecord, SampleRecord> valueMapper = buffered -> {
+        // Enrich each record with the mapped output key so downstream consumers can read it from the value
+        ValueMapper<String, SampleRecord, SampleRecord> valueMapper = (outputKey, buffered) -> {
             SampleRecord record = buffered.getRecord();
             if (record != null) {
-                record.setNewKey("partition-" + buffered.getPartition() + "-offset-" + buffered.getOffset());
+                record.setNewKey(outputKey);
             }
             return record;
         };

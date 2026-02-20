@@ -20,7 +20,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 import java.time.Duration
-import java.time.Instant
 
 class ResequenceProcessorSpec extends Specification {
 
@@ -55,7 +54,7 @@ class ResequenceProcessorSpec extends Specification {
             Serde<KR> outputKeySerde,
             Comparator<BufferedRecord<SampleRecord>> comparator,
             KeyMapper<K, KR> keyMapper,
-            ValueMapper<SampleRecord, SampleRecord> valueMapper) {
+            ValueMapper<KR, SampleRecord, SampleRecord> valueMapper) {
 
         buildTopology(keySerde, outputKeySerde, new JacksonJsonSerde<>(SampleRecord), comparator, keyMapper, valueMapper)
     }
@@ -66,7 +65,7 @@ class ResequenceProcessorSpec extends Specification {
             Serde<VR> outputValueSerde,
             Comparator<BufferedRecord<SampleRecord>> comparator,
             KeyMapper<K, KR> keyMapper,
-            ValueMapper<SampleRecord, VR> valueMapper) {
+            ValueMapper<KR, SampleRecord, VR> valueMapper) {
 
         def valueSerde = new JacksonJsonSerde<>(SampleRecord)
         def bufferedSerde = new BufferedRecordListSerde<>(SampleRecord, JsonMapper.builder().build())
@@ -229,7 +228,7 @@ class ResequenceProcessorSpec extends Specification {
         given: 'a topology with a value mapper that enriches newKey from Kafka metadata'
         def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-enriched' }
-        ValueMapper<SampleRecord, SampleRecord> valueMapper = { BufferedRecord<SampleRecord> buffered ->
+        ValueMapper<String, SampleRecord, SampleRecord> valueMapper = { String outputKey, BufferedRecord<SampleRecord> buffered ->
             def record = buffered.record
             if (record != null) {
                 record.newKey = "${record.clientId}-enriched"
@@ -293,7 +292,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should transform value to a different output type using value mapper'() {
         given: 'a topology with a value mapper that extracts operationType as a String'
         def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
-        ValueMapper<SampleRecord, String> valueMapper = { BufferedRecord<SampleRecord> buffered ->
+        ValueMapper<Long, SampleRecord, String> valueMapper = { Long outputKey, BufferedRecord<SampleRecord> buffered ->
             buffered.record?.operationType
         }
         def topology = buildTopology(Serdes.Long(), Serdes.Long(), Serdes.String(), comparator, null, valueMapper)
