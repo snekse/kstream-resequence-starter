@@ -13,15 +13,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.BiConsumer;
 
-public class ResequenceProcessor<K, V, KR> extends ContextualProcessor<K, V, KR, V> {
+public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V, KR, VR> {
 
     private final Comparator<BufferedRecord<V>> comparator;
     private final String stateStoreName;
     private final Duration flushInterval;
     private final KeyMapper<K, KR> keyMapper;
-    private final BiConsumer<KR, V> valueEnricher;
+    private final ValueMapper<V, VR> valueMapper;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
     public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval) {
@@ -29,16 +28,16 @@ public class ResequenceProcessor<K, V, KR> extends ContextualProcessor<K, V, KR,
     }
 
     public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval,
-                               KeyMapper<K, KR> keyMapper, BiConsumer<KR, V> valueEnricher) {
+                               KeyMapper<K, KR> keyMapper, ValueMapper<V, VR> valueMapper) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
-        this.valueEnricher = valueEnricher;
+        this.valueMapper = valueMapper;
     }
 
     @Override
-    public void init(ProcessorContext<KR, V> context) {
+    public void init(ProcessorContext<KR, VR> context) {
         super.init(context);
         this.store = context.getStateStore(stateStoreName);
 
@@ -88,13 +87,10 @@ public class ResequenceProcessor<K, V, KR> extends ContextualProcessor<K, V, KR,
                     // Map the key using the provided key mapper, or pass through unchanged
                     KR outputKey = keyMapper != null ? keyMapper.map(key) : (KR) key;
 
-                    // Forward each record
+                    // Forward each record, applying optional value mapper
                     for (BufferedRecord<V> br : records) {
-                        V r = br.getRecord();
-                        if (valueEnricher != null && r != null) {
-                            valueEnricher.accept(outputKey, r);
-                        }
-                        context().forward(new Record<>(outputKey, r, timestamp));
+                        VR mappedValue = valueMapper != null ? valueMapper.mapValue(br) : (VR) br.getRecord();
+                        context().forward(new Record<>(outputKey, mappedValue, timestamp));
                     }
 
                     // Clear the buffer for this key
