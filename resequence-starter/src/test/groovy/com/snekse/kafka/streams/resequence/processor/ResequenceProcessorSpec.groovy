@@ -263,4 +263,109 @@ class ResequenceProcessorSpec extends Specification {
         comparator.compare(tombstone, normal) == 0
         comparator.compare(normal, tombstone) == 0
     }
+
+    def 'should only flush records received since last flush cycle'() {
+        given: 'a topology with String keys'
+        def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
+        driver = new TopologyTestDriver(topology, driverConfig())
+
+        def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
+                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+        def outputTopic = driver.createOutputTopic(SINK_TOPIC,
+                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+
+        when: 'records are sent for key1 and key2 in the first cycle'
+        inputTopic.pipeInput('key1', new TestRecord('B', 2000L))
+        inputTopic.pipeInput('key1', new TestRecord('A', 1000L))
+        inputTopic.pipeInput('key2', new TestRecord('C', 3000L))
+
+        and: 'first flush triggers'
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'all 3 records are flushed'
+        def firstResults = outputTopic.readKeyValuesToList()
+        firstResults.size() == 3
+
+        when: 'only key2 receives new records in the second cycle'
+        inputTopic.pipeInput('key2', new TestRecord('B', 5000L))
+        inputTopic.pipeInput('key2', new TestRecord('A', 4000L))
+
+        and: 'second flush triggers'
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'only key2 records are emitted, sorted correctly'
+        def secondResults = outputTopic.readKeyValuesToList()
+        secondResults.size() == 2
+        secondResults.every { it.key == 'key2' }
+        secondResults[0].value.type == 'A'
+        secondResults[1].value.type == 'B'
+    }
+
+    def 'should produce no output when no records arrive between flushes'() {
+        given: 'a topology with String keys'
+        def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
+        driver = new TopologyTestDriver(topology, driverConfig())
+
+        def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
+                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+        def outputTopic = driver.createOutputTopic(SINK_TOPIC,
+                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+
+        when: 'a record is sent and first flush triggers'
+        inputTopic.pipeInput('key1', new TestRecord('A', 1000L))
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'first flush emits the record'
+        outputTopic.readKeyValuesToList().size() == 1
+
+        when: 'no records are sent and second flush triggers'
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'no output is produced'
+        outputTopic.readKeyValuesToList().isEmpty()
+    }
+
+    def 'should correctly flush across multiple cycles with different keys'() {
+        given: 'a topology with String keys'
+        def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
+        driver = new TopologyTestDriver(topology, driverConfig())
+
+        def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
+                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+        def outputTopic = driver.createOutputTopic(SINK_TOPIC,
+                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+
+        when: 'cycle 1: key1 gets out-of-order records'
+        inputTopic.pipeInput('key1', new TestRecord('C', 3000L))
+        inputTopic.pipeInput('key1', new TestRecord('A', 1000L))
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'cycle 1 output is sorted'
+        def cycle1 = outputTopic.readKeyValuesToList()
+        cycle1.size() == 2
+        cycle1[0].value.type == 'A'
+        cycle1[1].value.type == 'C'
+
+        when: 'cycle 2: key2 and key3 get records'
+        inputTopic.pipeInput('key2', new TestRecord('B', 2000L))
+        inputTopic.pipeInput('key3', new TestRecord('A', 1000L))
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'cycle 2 output contains both keys'
+        def cycle2 = outputTopic.readKeyValuesToList()
+        cycle2.size() == 2
+        cycle2.collect { it.key }.toSet() == ['key2', 'key3'] as Set
+
+        when: 'cycle 3: key1 returns with new records'
+        inputTopic.pipeInput('key1', new TestRecord('B', 5000L))
+        inputTopic.pipeInput('key1', new TestRecord('A', 4000L))
+        driver.advanceWallClockTime(FLUSH_INTERVAL)
+
+        then: 'cycle 3 output is only key1, sorted'
+        def cycle3 = outputTopic.readKeyValuesToList()
+        cycle3.size() == 2
+        cycle3.every { it.key == 'key1' }
+        cycle3[0].value.type == 'A'
+        cycle3[1].value.type == 'B'
+    }
 }
