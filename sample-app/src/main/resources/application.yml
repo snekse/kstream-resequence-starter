@@ -23,4 +23,23 @@ resequence:
 
 logging:
   level:
+    root: WARN
+    # Application signal: producer sends shuffled records, consumer receives resequenced records
     com.example.sampleapp: INFO
+    com.snekse: INFO
+    # Spring Boot startup ("Starting...", "Started in X seconds")
+    org.springframework.boot: INFO
+    # Kafka listener partition assignment/revoke events
+    org.springframework.kafka.listener: INFO
+    # Kafka Streams client state transitions (CREATED → REBALANCING → RUNNING)
+    org.apache.kafka.streams.KafkaStreams: INFO
+    # Suppress Kafka internals explicitly (root=WARN covers most, these need ERROR)
+    state.change.logger: WARN
+    # NetworkClient emits transient WARNs during topic creation (UNKNOWN_TOPIC_OR_PARTITION)
+    # and on normal shutdown ("already closed") — not actionable
+    org.apache.kafka.clients.NetworkClient: ERROR
+    # Task-corrupted WARNs are expected on every rerun when using an OS temp state.dir
+    org.apache.kafka.streams.processor.internals.assignment: ERROR
+    # Embedded KRaft broker bootstrap noise
+    org.apache.kafka.controller.QuorumController: ERROR
+    org.apache.kafka.raft: ERROR
