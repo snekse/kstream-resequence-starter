@@ -51,7 +51,7 @@ Source topic (`sample-topic`) → Resequencing processor with state store → Si
 
 **Sample-app types** (`com.example.sampleapp`):
 - `SampleRecord` - Domain object with clientId, entityType, operation, timestamp
-- `ResequenceComparator` - Domain-specific comparator implementing the ordering logic
+- `SampleRecordComparator` - Domain-specific comparator implementing the ordering logic
 - `EntityType` enum: Parent, ChildA, ChildB
 
 ## Code Style Rules
