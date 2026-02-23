@@ -1,4 +1,4 @@
-package com.example.sampleapp.processor;
+package com.snekse.kafka.streams.resequence.processor;
 
 @FunctionalInterface
 public interface KeyMapper<K, KR> {

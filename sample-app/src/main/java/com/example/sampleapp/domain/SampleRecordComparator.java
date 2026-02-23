@@ -1,9 +1,12 @@
 package com.example.sampleapp.domain;
 
-import java.util.Comparator;
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
+import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder;
+
 import java.util.Map;
 
-public class ResequenceComparator implements Comparator<BufferedRecord<SampleRecord>> {
+public class SampleRecordComparator implements ResequenceComparator<SampleRecord> {
 
     private static final Map<String, Integer> OPERATION_ORDER = Map.of(
             "CREATE", 0,
@@ -12,7 +15,7 @@ public class ResequenceComparator implements Comparator<BufferedRecord<SampleRec
 
     private final TombstoneSortOrder tombstoneSortOrder;
 
-    public ResequenceComparator(TombstoneSortOrder tombstoneSortOrder) {
+    public SampleRecordComparator(TombstoneSortOrder tombstoneSortOrder) {
         this.tombstoneSortOrder = tombstoneSortOrder;
     }
 

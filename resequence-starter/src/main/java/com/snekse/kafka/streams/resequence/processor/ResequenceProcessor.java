@@ -1,6 +1,7 @@
-package com.example.sampleapp.processor;
+package com.snekse.kafka.streams.resequence.processor;
 
-import com.example.sampleapp.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
@@ -11,29 +12,30 @@ import org.apache.kafka.streams.state.KeyValueStore;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V, KR, VR> {
 
-    private final Comparator<BufferedRecord<V>> comparator;
+    private final ResequenceComparator<V> comparator;
     private final String stateStoreName;
     private final Duration flushInterval;
     private final KeyMapper<K, KR> keyMapper;
     private final ValueMapper<KR, V, VR> valueMapper;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
-    public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, ValueMapper.noOp());
+    @SuppressWarnings("unchecked")
+    public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
+        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp());
     }
 
-    public ResequenceProcessor(Comparator<BufferedRecord<V>> comparator, String stateStoreName, Duration flushInterval,
+    @SuppressWarnings("unchecked")
+    public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
                                KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
-        this.valueMapper = valueMapper != null ? valueMapper : ValueMapper.noOp();
+        this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp();
     }
 
     @Override

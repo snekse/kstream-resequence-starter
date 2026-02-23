@@ -1,11 +1,14 @@
 package com.example.sampleapp.processor
 
-import com.example.sampleapp.domain.TombstoneSortOrder
-import com.example.sampleapp.domain.BufferedRecord
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord
+import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder
+import com.snekse.kafka.streams.resequence.processor.KeyMapper
+import com.snekse.kafka.streams.resequence.processor.ResequenceProcessor
+import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde
 import com.example.sampleapp.domain.EntityType
-import com.example.sampleapp.domain.ResequenceComparator
+import com.example.sampleapp.domain.SampleRecordComparator
 import com.example.sampleapp.domain.SampleRecord
-import com.example.sampleapp.serde.BufferedRecordListSerde
+import com.snekse.kafka.streams.resequence.processor.ValueMapper
 import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.StreamsConfig
@@ -98,7 +101,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should resequence with Long keys and identity key mapper (no re-keying)'() {
         given: 'a topology with Long input and output keys, no key mapper'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         def topology = buildTopology(Serdes.Long(), Serdes.Long(), comparator, null, null)
         driver = new TopologyTestDriver(topology, driverConfig())
 
@@ -134,7 +137,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should resequence with Long input keys and String output keys via key mapper'() {
         given: 'a topology with Long to String re-keying'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-sorted' }
         def topology = buildTopology(Serdes.Long(), Serdes.String(), comparator, keyMapper, null)
         driver = new TopologyTestDriver(topology, driverConfig())
@@ -165,7 +168,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should resequence with String input keys and no re-keying'() {
         given: 'a topology with String keys, no key mapper'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         def topology = buildTopology(Serdes.String(), Serdes.String(), comparator, null, null)
         driver = new TopologyTestDriver(topology, driverConfig())
 
@@ -195,7 +198,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should resequence with Integer keys and Long output keys'() {
         given: 'a topology with Integer to Long re-keying'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         KeyMapper<Integer, Long> keyMapper = { Integer key -> key.toLong() * 1000L }
         def topology = buildTopology(Serdes.Integer(), Serdes.Long(), comparator, keyMapper, null)
         driver = new TopologyTestDriver(topology, driverConfig())
@@ -226,7 +229,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should apply value mapper to enrich output records using Kafka metadata'() {
         given: 'a topology with a value mapper that enriches newKey from Kafka metadata'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-enriched' }
         ValueMapper<String, SampleRecord, SampleRecord> valueMapper = { String outputKey, BufferedRecord<SampleRecord> buffered ->
             def record = buffered.record
@@ -266,7 +269,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should not invoke value mapper when not provided'() {
         given: 'a topology without a value mapper'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-mapped' }
         def topology = buildTopology(Serdes.Long(), Serdes.String(), comparator, keyMapper, null)
         driver = new TopologyTestDriver(topology, driverConfig())
@@ -291,7 +294,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should transform value to a different output type using value mapper'() {
         given: 'a topology with a value mapper that extracts operationType as a String'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         ValueMapper<Long, SampleRecord, String> valueMapper = { Long outputKey, BufferedRecord<SampleRecord> buffered ->
             buffered.record?.operationType
         }
@@ -322,7 +325,7 @@ class ResequenceProcessorSpec extends Specification {
 
     def 'should handle null keys with generic key types'() {
         given: 'a topology with String keys'
-        def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+        def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
         def topology = buildTopology(Serdes.String(), Serdes.String(), comparator, null, null)
         driver = new TopologyTestDriver(topology, driverConfig())
 

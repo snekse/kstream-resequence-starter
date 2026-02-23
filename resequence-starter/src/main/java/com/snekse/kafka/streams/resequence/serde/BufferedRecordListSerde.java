@@ -1,6 +1,6 @@
-package com.example.sampleapp.serde;
+package com.snekse.kafka.streams.resequence.serde;
 
-import com.example.sampleapp.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;

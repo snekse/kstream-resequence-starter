@@ -1,4 +1,4 @@
-package com.example.sampleapp.domain;
+package com.snekse.kafka.streams.resequence.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

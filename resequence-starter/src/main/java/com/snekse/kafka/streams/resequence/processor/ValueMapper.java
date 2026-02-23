@@ -1,6 +1,6 @@
-package com.example.sampleapp.processor;
+package com.snekse.kafka.streams.resequence.processor;
 
-import com.example.sampleapp.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
 
 /**
  * Functional interface for transforming a buffered record's value before forwarding.
