@@ -8,7 +8,7 @@ A Spring Boot Starter library implementing the **Resequence Enterprise Integrati
 
 **Modules:**
 - `resequence-starter` - Core library (`com.snekse.kafka.streams.resequence`): `ResequenceProcessor`, `BufferedRecord`, `KeyMapper`, `TombstoneSortOrder`, `BufferedRecordListSerde`, `ResequenceProperties`, auto-configuration
-- `sample-app` - Reference implementation (`com.example.sampleapp`): domain-specific `ResequenceComparator`, `SampleRecord`, topology wiring
+- `sample-app` - Reference implementation (`com.example.sampleapp`): domain-specific `SampleRecordComparator`, `SampleRecord`, topology wiring
 
 ## Build Commands
 
