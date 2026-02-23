@@ -10,6 +10,9 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @SpringBootApplication
 public class SampleApplication {
@@ -29,9 +32,11 @@ public class SampleApplication {
             producer.produceSampleData();
             if (autoShutdown) {
                 log.info("Auto-shutdown in {} seconds...", autoShutdownDelaySecs);
-                Thread.sleep(autoShutdownDelaySecs * 1000L);
-                log.info("Shutting down.");
-                System.exit(SpringApplication.exit(ctx));
+                Executors.newSingleThreadScheduledExecutor()
+                        .schedule(() -> {
+                            log.info("Shutting down.");
+                            System.exit(SpringApplication.exit(ctx));
+                        }, autoShutdownDelaySecs, TimeUnit.SECONDS);
             }
         };
     }
