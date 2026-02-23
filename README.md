@@ -129,6 +129,8 @@ The **Aggregator** is the right SI component because it provides custom correlat
 ./gradlew :sample-app:bootRun
 ```
 
+See [sample-app/README.md](sample-app/README.md) for sample app CLI options.
+
 ## Technologies
 
 - **Java 21** (enforced via Gradle toolchain)
