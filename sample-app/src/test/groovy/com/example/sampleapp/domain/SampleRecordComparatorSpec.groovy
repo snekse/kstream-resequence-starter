@@ -1,15 +1,12 @@
 package com.example.sampleapp.domain
 
-import com.example.sampleapp.domain.BufferedRecord
-import com.example.sampleapp.domain.EntityType
-import com.example.sampleapp.domain.ResequenceComparator
-import com.example.sampleapp.domain.SampleRecord
-import com.example.sampleapp.domain.TombstoneSortOrder
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord
+import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder
 import spock.lang.Specification
 
-class ResequenceComparatorSpec extends Specification {
+class SampleRecordComparatorSpec extends Specification {
 
-    def comparator = new ResequenceComparator(TombstoneSortOrder.LAST)
+    def comparator = new SampleRecordComparator(TombstoneSortOrder.LAST)
 
     def 'should order by operation type: CREATE < UPDATE < DELETE'() {
         given: 'records with different operation types but same timestamps'
@@ -146,6 +143,80 @@ class ResequenceComparatorSpec extends Specification {
 
         and: 'normal record is less than tombstone'
         comparator.compare(normalRecord, tombstone) < 0
+    }
+
+    def 'should treat tombstones as equal with EQUAL configuration'() {
+        given: 'comparator with EQUAL configuration'
+        def equalComparator = new SampleRecordComparator(TombstoneSortOrder.EQUAL)
+        def baseTimestamp = System.currentTimeMillis()
+        def normalRecord = bufferedRecord('UPDATE', baseTimestamp, 0, 0, baseTimestamp)
+        def tombstone = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(1)
+                .timestamp(baseTimestamp)
+                .build()
+
+        when: 'comparing normal record to tombstone'
+        def result = equalComparator.compare(normalRecord, tombstone)
+
+        then: 'they are considered equal'
+        result == 0
+
+        and: 'comparison in reverse order is also equal'
+        equalComparator.compare(tombstone, normalRecord) == 0
+    }
+
+    def 'should sort tombstones to beginning with FIRST configuration'() {
+        given: 'comparator with FIRST configuration'
+        def firstComparator = new SampleRecordComparator(TombstoneSortOrder.FIRST)
+        def baseTimestamp = System.currentTimeMillis()
+        def normalRecord = bufferedRecord('UPDATE', baseTimestamp, 0, 0, baseTimestamp)
+        def tombstone = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(1)
+                .timestamp(baseTimestamp)
+                .build()
+
+        when: 'comparing normal record to tombstone'
+        def result = firstComparator.compare(normalRecord, tombstone)
+
+        then: 'normal record is greater than tombstone (sorts after)'
+        result > 0
+
+        and: 'tombstone is less than normal record (sorts before)'
+        firstComparator.compare(tombstone, normalRecord) < 0
+    }
+
+    def 'should sort multiple tombstones with FIRST configuration'() {
+        given: 'records with tombstones'
+        def baseTimestamp = System.currentTimeMillis()
+        def create = bufferedRecord('CREATE', baseTimestamp, 0, 0, baseTimestamp)
+        def update = bufferedRecord('UPDATE', baseTimestamp, 0, 1, baseTimestamp)
+        def tombstone1 = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(2)
+                .timestamp(baseTimestamp)
+                .build()
+        def tombstone2 = BufferedRecord.builder()
+                .record(null)
+                .partition(0)
+                .offset(3)
+                .timestamp(baseTimestamp)
+                .build()
+
+        when: 'sorting with FIRST configuration'
+        def firstComparator = new SampleRecordComparator(TombstoneSortOrder.FIRST)
+        def records = [update, create, tombstone1, tombstone2]
+        records.sort(firstComparator)
+
+        then: 'tombstones come first'
+        records[0].record == null
+        records[1].record == null
+        records[2].record.operationType == 'CREATE'
+        records[3].record.operationType == 'UPDATE'
     }
 
     def 'should handle complex scenario with multiple ordering criteria'() {

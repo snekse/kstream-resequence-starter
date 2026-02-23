@@ -1,22 +1,26 @@
 plugins {
     `java-library`
     groovy
+    id("io.freefair.lombok") version "9.1.0"
 }
 
 dependencies {
-    implementation("org.apache.groovy:groovy:5.0.0-alpha-1") // Explicitly using Groovy 5
-    api("org.springframework.boot:spring-boot-starter")
-    api("org.springframework.kafka:spring-kafka")
     api("org.apache.kafka:kafka-streams")
-    api("com.jayway.jsonpath:json-path")
-    api("com.fasterxml.jackson.core:jackson-databind")
+    implementation("org.springframework.boot:spring-boot-autoconfigure")
+    implementation("tools.jackson.core:jackson-databind")
+
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-json")
     testImplementation("org.spockframework:spock-core:2.4-groovy-5.0")
     testImplementation("org.spockframework:spock-spring:2.4-groovy-5.0")
     testImplementation("org.apache.kafka:kafka-streams-test-utils")
+    testImplementation("org.springframework.kafka:spring-kafka")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+tasks.withType<JavaCompile> {
+    options.compilerArgs.add("-parameters")
 }

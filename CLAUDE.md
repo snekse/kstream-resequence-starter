@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Spring Boot Starter library implementing the **Resequence Enterprise Integration Pattern** for Kafka Streams. Messages arriving out-of-order are buffered and re-emitted in the correct sequence based on configurable ordering logic.
 
 **Modules:**
-- `resequence-starter` - Core library with resequencing logic and auto-configuration
-- `sample-app` - Reference implementation demonstrating the starter
+- `resequence-starter` - Core library (`com.snekse.kafka.streams.resequence`): `ResequenceProcessor`, `BufferedRecord`, `KeyMapper`, `TombstoneSortOrder`, `BufferedRecordListSerde`, `ResequenceProperties`, auto-configuration
+- `sample-app` - Reference implementation (`com.example.sampleapp`): domain-specific `ResequenceComparator`, `SampleRecord`, topology wiring
 
 ## Build Commands
 
@@ -30,7 +30,7 @@ A Spring Boot Starter library implementing the **Resequence Enterprise Integrati
 
 ### Resequencing Pattern
 
-The core pattern buffers out-of-order messages using Kafka Streams Session Windows, then re-emits them sorted by a pluggable `Comparator`. The `ResequenceComparator` in the sample app orders by:
+The core pattern buffers out-of-order messages using a wall-clock punctuator, then re-emits them sorted by a pluggable `Comparator`. The `ResequenceComparator` in the sample app orders by:
 1. Operation type: CREATE (0) < UPDATE (1) < DELETE (2)
 2. Fallback to payload timestamp
 3. Fallback to Kafka metadata (offset within partition, timestamp across partitions)
@@ -39,12 +39,20 @@ The core pattern buffers out-of-order messages using Kafka Streams Session Windo
 
 Source topic (`sample-topic`) → Resequencing processor with state store → Sink topic (`sample-topic-resequenced`)
 
-### Key Domain Types
+### Key Types
 
-- `SampleRecord` - Domain object with entityId, entityType, operation, timestamp
-- `BufferedRecord` - Wraps records with Kafka metadata (partition, offset, timestamp) for ordering
+**Starter types** (`com.snekse.kafka.streams.resequence`):
+- `ResequenceProcessor` - Kafka Streams processor that buffers, sorts, and forwards records
+- `BufferedRecord<T>` - Wraps records with Kafka metadata (partition, offset, timestamp) for ordering
+- `KeyMapper<K, KR>` - Functional interface for key re-mapping
+- `TombstoneSortOrder` - Enum: FIRST, EQUAL, LAST
+- `BufferedRecordListSerde<T>` - Jackson-based serde for state store
+- `ResequenceProperties` - Spring Boot configuration properties
+
+**Sample-app types** (`com.example.sampleapp`):
+- `SampleRecord` - Domain object with clientId, entityType, operation, timestamp
+- `ResequenceComparator` - Domain-specific comparator implementing the ordering logic
 - `EntityType` enum: Parent, ChildA, ChildB
-- Operations: CREATE, UPDATE, DELETE
 
 ## Code Style Rules
 
@@ -54,6 +62,10 @@ Source topic (`sample-topic`) → Resequencing processor with state store → Si
 **Groovy/Spock:**
 - Follow `.agent/skills/self-review-before-finishing-tasks/spock-tests-guide.md` when writing and planning Spock tests
 - Test files must be named `*Spec.groovy`
+
+## Documentation
+
+- `docs/adr/` - Architectural Decision Records
 
 ## Agent Infrastructure
 

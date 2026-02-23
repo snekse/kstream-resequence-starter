@@ -1,6 +1,6 @@
-package com.example.sampleapp.config;
+package com.snekse.kafka.streams.resequence.config;
 
-import com.example.sampleapp.domain.TombstoneSortOrder;
+import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;

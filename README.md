@@ -53,8 +53,8 @@ Records with null keys are silently skipped — they cannot be grouped by key an
 
 ## Modules
 
-- **`resequence-starter`** — Core library with resequencing logic and Spring Boot auto-configuration
-- **`sample-app`** — Reference implementation demonstrating the starter using the Kafka Streams Processor API
+- **`resequence-starter`** — Core library providing the generic resequencing processor, supporting types (`BufferedRecord`, `TombstoneSortOrder`, `KeyMapper`, `BufferedRecordListSerde`), configuration properties, and Spring Boot auto-configuration. Package: `com.snekse.kafka.streams.resequence`
+- **`sample-app`** — Reference implementation demonstrating the starter. Provides the domain-specific `ResequenceComparator`, `SampleRecord`, and topology wiring (`ResequenceTopologyConfig`). Package: `com.example.sampleapp`
 
 ## Architecture
 
@@ -62,6 +62,8 @@ Records with null keys are silently skipped — they cannot be grouped by key an
 Source Topic → [ResequenceProcessor + RocksDB State Store] → Sink Topic
                     ↑ wall-clock punctuator flushes every 2s
 ```
+
+The **starter** provides the processor and building blocks. The **application** provides the domain-specific comparator and topology wiring.
 
 - Uses the **Processor API** (not the high-level DSL) for fine-grained control
 - `ResequenceProcessor` buffers incoming records in a `KeyValueStore<K, List<BufferedRecord<V>>>` grouped by Kafka key

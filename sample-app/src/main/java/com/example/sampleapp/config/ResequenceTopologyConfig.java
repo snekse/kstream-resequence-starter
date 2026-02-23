@@ -1,32 +1,31 @@
 package com.example.sampleapp.config;
 
-import com.example.sampleapp.domain.BufferedRecord;
-import com.example.sampleapp.domain.ResequenceComparator;
+import com.example.sampleapp.domain.SampleRecordComparator;
 import com.example.sampleapp.domain.SampleRecord;
-import com.example.sampleapp.processor.KeyMapper;
-import com.example.sampleapp.processor.ResequenceProcessor;
-import com.example.sampleapp.processor.ValueMapper;
-import com.example.sampleapp.serde.BufferedRecordListSerde;
+import com.snekse.kafka.streams.resequence.config.ResequenceProperties;
+import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
+import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
+import com.snekse.kafka.streams.resequence.processor.KeyMapper;
+import com.snekse.kafka.streams.resequence.processor.ResequenceProcessor;
+import com.snekse.kafka.streams.resequence.processor.ValueMapper;
+import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.Stores;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import tools.jackson.databind.json.JsonMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.support.serializer.JacksonJsonSerde;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
 @Configuration
 @EnableKafkaStreams
-@EnableConfigurationProperties(ResequenceProperties.class)
 public class ResequenceTopologyConfig {
 
     @Bean
@@ -41,8 +40,8 @@ public class ResequenceTopologyConfig {
     }
 
     @Bean
-    public Comparator<BufferedRecord<SampleRecord>> resequenceComparator(ResequenceProperties properties) {
-        return new ResequenceComparator(properties.getTombstoneSortOrder());
+    public ResequenceComparator<SampleRecord> resequenceComparator(ResequenceProperties properties) {
+        return new SampleRecordComparator(properties.getTombstoneSortOrder());
     }
 
     @Bean
@@ -53,7 +52,7 @@ public class ResequenceTopologyConfig {
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
             Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
-            Comparator<BufferedRecord<SampleRecord>> resequenceComparator) {
+            ResequenceComparator<SampleRecord> resequenceComparator) {
 
         String stateStoreName = resequenceProperties.getStateStoreName();
         Topology topology = builder.build();

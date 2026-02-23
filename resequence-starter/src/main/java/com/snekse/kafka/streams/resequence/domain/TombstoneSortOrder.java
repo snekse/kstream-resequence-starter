@@ -1,4 +1,4 @@
-package com.example.sampleapp.domain;
+package com.snekse.kafka.streams.resequence.domain;
 
 public enum TombstoneSortOrder {
     FIRST(-1),
