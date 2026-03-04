@@ -63,7 +63,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
 
     @SuppressWarnings("unchecked")
     public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp());
+        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) ValueMapper.noOp());
     }
 
     @SuppressWarnings("unchecked")
@@ -73,7 +73,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
-        this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp();
+        this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) ValueMapper.noOp();
     }
 
     @Override
