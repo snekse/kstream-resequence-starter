@@ -1,6 +1,7 @@
 package com.snekse.kafka.streams.resequence.serde
 
 import com.snekse.kafka.streams.resequence.domain.BufferedRecord
+import org.apache.kafka.common.errors.SerializationException
 import tools.jackson.databind.json.JsonMapper
 import spock.lang.Specification
 
@@ -50,5 +51,34 @@ class BufferedRecordListSerdeSpec extends Specification {
     def 'should deserialize null to empty list'() {
         expect:
         serde.deserializer().deserialize('test-topic', null) == []
+    }
+
+    def 'should throw SerializationException with topic details when serialization fails'() {
+        given:
+        def objectSerde = new BufferedRecordListSerde<>(Object, mapper)
+        def records = [
+            BufferedRecord.<Object>builder()
+                .record(new Object())
+                .partition(0)
+                .offset(10L)
+                .timestamp(1000L)
+                .build()
+        ]
+
+        when:
+        objectSerde.serializer().serialize('failing-topic', records)
+
+        then:
+        def ex = thrown(SerializationException)
+        ex.message == "Failed to serialize buffered record list for topic 'failing-topic'"
+    }
+
+    def 'should throw SerializationException with topic details when deserialization fails'() {
+        when:
+        serde.deserializer().deserialize('broken-topic', 'not-json'.bytes)
+
+        then:
+        def ex = thrown(SerializationException)
+        ex.message == "Failed to deserialize buffered record list for topic 'broken-topic'"
     }
 }

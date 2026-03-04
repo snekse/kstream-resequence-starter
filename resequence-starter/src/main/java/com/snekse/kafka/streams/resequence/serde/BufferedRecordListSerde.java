@@ -1,6 +1,7 @@
 package com.snekse.kafka.streams.resequence.serde;
 
 import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
+import org.apache.kafka.common.errors.SerializationException;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
@@ -30,7 +31,10 @@ public class BufferedRecordListSerde<T> implements Serde<List<BufferedRecord<T>>
             try {
                 return mapper.writeValueAsBytes(data);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize list", e);
+                throw new SerializationException(
+                        "Failed to serialize buffered record list for topic '" + topic + "'",
+                        e
+                );
             }
         };
     }
@@ -42,7 +46,10 @@ public class BufferedRecordListSerde<T> implements Serde<List<BufferedRecord<T>>
             try {
                 return mapper.readValue(data, javaType);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to deserialize list", e);
+                throw new SerializationException(
+                        "Failed to deserialize buffered record list for topic '" + topic + "'",
+                        e
+                );
             }
         };
     }
