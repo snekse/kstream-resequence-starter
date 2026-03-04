@@ -61,7 +61,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
     private boolean needsRecoveryScan = true;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "unused"})
     public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
         this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) ValueMapper.noOp());
     }
