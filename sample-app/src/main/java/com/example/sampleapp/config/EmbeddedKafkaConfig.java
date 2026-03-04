@@ -58,6 +58,7 @@ public class EmbeddedKafkaConfig {
     public KafkaStreamsConfiguration kStreamsConfigs(KafkaProperties kafkaProperties, EmbeddedKafkaBroker broker) {
         Map<String, Object> props = new HashMap<>(kafkaProperties.buildStreamsProperties());
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
+        props.put(StreamsConfig.STATE_DIR_CONFIG, StreamsStateDirFactory.createIsolatedStateDir("sample-app-streams-state-"));
         return new KafkaStreamsConfiguration(props);
     }
 }

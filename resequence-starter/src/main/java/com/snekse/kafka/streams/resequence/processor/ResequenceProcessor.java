@@ -20,6 +20,17 @@ import java.util.Set;
  * Kafka Streams processor that buffers incoming records and re-emits them in sorted order on a
  * wall-clock punctuator schedule.
  *
+ * <h2>State-store prerequisites</h2>
+ * <ol>
+ *   <li>This processor expects a connected {@link KeyValueStore} named {@code stateStoreName}.</li>
+ *   <li>The store should be persistent (for example, via {@code Stores.persistentKeyValueStore})
+ *       so Kafka Streams can restore buffered records from the changelog after restarts.</li>
+ *   <li>Applications should explicitly configure Kafka Streams local state directory via
+ *       {@code org.apache.kafka.streams.StreamsConfig#STATE_DIR_CONFIG}. In production, point it
+ *       to stable local disk. In ephemeral embedded/local runs, use an isolated directory per run
+ *       to avoid stale checkpoints when brokers/topics are recreated.</li>
+ * </ol>
+ *
  * <h2>Flushing flow</h2>
  * <ol>
  *   <li>Each call to {@link #process} appends the incoming record to the state store entry for its
@@ -61,9 +72,9 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
     private boolean needsRecoveryScan = true;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "unused"})
     public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp());
+        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) ValueMapper.noOp());
     }
 
     @SuppressWarnings("unchecked")
@@ -73,7 +84,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
-        this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) (ValueMapper<?, V, ?>) ValueMapper.noOp();
+        this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) ValueMapper.noOp();
     }
 
     @Override

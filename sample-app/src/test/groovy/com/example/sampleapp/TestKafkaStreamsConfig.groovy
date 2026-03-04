@@ -1,6 +1,7 @@
 package com.example.sampleapp
 
 import com.example.sampleapp.domain.SampleRecord
+import com.example.sampleapp.config.StreamsStateDirFactory
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.Serde
@@ -33,6 +34,7 @@ class TestKafkaStreamsConfig {
         Map<String, Object> props = new HashMap<>()
         props.putAll(kafkaProperties.buildStreamsProperties())
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBroker.getBrokersAsString())
+        props.put(StreamsConfig.STATE_DIR_CONFIG, StreamsStateDirFactory.createIsolatedStateDir('sample-app-streams-state-test-'))
         return new KafkaStreamsConfiguration(props)
     }
 
