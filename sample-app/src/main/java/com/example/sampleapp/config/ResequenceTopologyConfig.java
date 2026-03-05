@@ -6,6 +6,7 @@ import com.snekse.kafka.streams.resequence.config.ResequenceProperties;
 import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
 import com.snekse.kafka.streams.resequence.processor.KeyMapper;
+import com.snekse.kafka.streams.resequence.listener.ResequenceEventListener;
 import com.snekse.kafka.streams.resequence.processor.ResequenceProcessor;
 import com.snekse.kafka.streams.resequence.processor.ValueMapper;
 import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde;
@@ -52,7 +53,8 @@ public class ResequenceTopologyConfig {
             StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
             Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
-            ResequenceComparator<SampleRecord> resequenceComparator) {
+            ResequenceComparator<SampleRecord> resequenceComparator,
+            ResequenceEventListener listener) {
 
         String stateStoreName = resequenceProperties.getStateStoreName();
         Topology topology = builder.build();
@@ -83,7 +85,7 @@ public class ResequenceTopologyConfig {
 
         // Add processor with injected comparator, state store name, and flush interval
         topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor<>(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval(), keyMapper, valueMapper),
+                () -> new ResequenceProcessor<>(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval(), keyMapper, valueMapper, listener),
                 "source");
 
         // Connect state store to processor

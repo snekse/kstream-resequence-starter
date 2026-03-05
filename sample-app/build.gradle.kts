@@ -13,6 +13,11 @@ implementation("org.springframework.boot:spring-boot-starter-kafka")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
 
+    // OTel SDK for runtime metric emission
+    implementation("io.opentelemetry:opentelemetry-api")
+    implementation("io.opentelemetry:opentelemetry-sdk")
+    implementation("io.opentelemetry:opentelemetry-exporter-logging")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.kafka:spring-kafka-test")
     testImplementation("org.apache.kafka:kafka-streams-test-utils")
