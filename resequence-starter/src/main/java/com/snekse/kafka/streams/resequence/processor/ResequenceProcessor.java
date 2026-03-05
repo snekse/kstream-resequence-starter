@@ -2,6 +2,7 @@ package com.snekse.kafka.streams.resequence.processor;
 
 import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
+import com.snekse.kafka.streams.resequence.listener.ResequenceEventListener;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
@@ -68,23 +69,33 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
     private final Duration flushInterval;
     private final KeyMapper<K, KR> keyMapper;
     private final ValueMapper<KR, V, VR> valueMapper;
+    private final ResequenceEventListener listener;
     private final Set<K> dirtyKeys = new HashSet<>();
     private boolean needsRecoveryScan = true;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
     @SuppressWarnings({"unchecked", "unused"})
     public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) ValueMapper.noOp());
+        this(comparator, stateStoreName, flushInterval, null,
+                (ValueMapper<KR, V, VR>) ValueMapper.noOp(), ResequenceEventListener.noOp());
     }
 
     @SuppressWarnings("unchecked")
     public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
                                KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
+        this(comparator, stateStoreName, flushInterval, keyMapper, valueMapper, ResequenceEventListener.noOp());
+    }
+
+    @SuppressWarnings("unchecked")
+    public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
+                               KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper,
+                               ResequenceEventListener listener) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
         this.keyMapper = keyMapper;
         this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) ValueMapper.noOp();
+        this.listener = listener != null ? listener : ResequenceEventListener.noOp();
     }
 
     @Override
@@ -103,6 +114,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
 
         // Skip records with null keys to avoid NPE in state store operations
         if (key == null) {
+            listener.onRecordIgnored();
             return;
         }
 
@@ -122,6 +134,12 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
         records.add(buffered);
         store.put(key, records);
         dirtyKeys.add(key);
+
+        // Notify tombstone before the general buffered callback
+        if (value == null) {
+            listener.onTombstoneReceived(key, buffered);
+        }
+        listener.onRecordBuffered(key, buffered);
     }
 
     /**
@@ -130,24 +148,27 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
      * Clears {@code dirtyKeys} after either path completes.
      */
     private void flushAll(long timestamp) {
+        listener.onFlushStarted(needsRecoveryScan);
+        int[] totals = {0, 0}; // [keysCount, recordsCount]
         if (needsRecoveryScan) {
-            flushViaFullScan(timestamp);
+            flushViaFullScan(timestamp, totals);
             needsRecoveryScan = false;
         } else {
-            flushViaDirtyKeys(timestamp);
+            flushViaDirtyKeys(timestamp, totals);
         }
         dirtyKeys.clear();
+        listener.onFlushCompleted(totals[0], totals[1]);
     }
 
     /**
      * Scans the entire state store and flushes every key. Used once per task assignment to recover
      * records that were persisted before this processor instance was created.
      */
-    private void flushViaFullScan(long timestamp) {
+    private void flushViaFullScan(long timestamp, int[] totals) {
         try (KeyValueIterator<K, List<BufferedRecord<V>>> iter = store.all()) {
             while (iter.hasNext()) {
                 var entry = iter.next();
-                flushKey(entry.key, entry.value, timestamp);
+                flushKey(entry.key, entry.value, timestamp, totals);
             }
         }
     }
@@ -157,10 +178,10 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
      * lookups ({@code store.get}) rather than a full scan, keeping flush cost proportional to
      * write activity rather than total store size.
      */
-    private void flushViaDirtyKeys(long timestamp) {
+    private void flushViaDirtyKeys(long timestamp, int[] totals) {
         for (K key : dirtyKeys) {
             List<BufferedRecord<V>> records = store.get(key);
-            flushKey(key, records, timestamp);
+            flushKey(key, records, timestamp, totals);
         }
     }
 
@@ -169,7 +190,7 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
      * entry. No-ops if {@code records} is null or empty. Called by both flush paths.
      */
     @SuppressWarnings("unchecked")
-    private void flushKey(K key, List<BufferedRecord<V>> records, long timestamp) {
+    private void flushKey(K key, List<BufferedRecord<V>> records, long timestamp, int[] totals) {
         if (records == null || records.isEmpty()) {
             return;
         }
@@ -186,7 +207,13 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
             context().forward(new Record<>(outputKey, mappedValue, timestamp));
         }
 
+        // Notify before deleting so the listener can still inspect the store if needed
+        listener.onKeyFlushed(key, records.size());
+
         // Clear the buffer for this key
         store.delete(key);
+
+        totals[0]++;
+        totals[1] += records.size();
     }
 }
