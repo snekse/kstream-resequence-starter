@@ -4,14 +4,13 @@ import com.snekse.kafka.streams.resequence.domain.BufferedRecord
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator
 import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder
 import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde
+import com.snekse.kafka.streams.resequence.test.TestJsonSerde
 import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.StreamsConfig
 import org.apache.kafka.streams.TopologyTestDriver
 import org.apache.kafka.streams.Topology
 import org.apache.kafka.streams.state.Stores
-import org.springframework.kafka.support.serializer.JacksonJsonSerde
-import tools.jackson.databind.json.JsonMapper
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
@@ -62,6 +61,10 @@ class ResequenceProcessorSpec extends Specification {
 
     static final ResequenceComparator<TestRecord> TEST_COMPARATOR = comparatorWith(TombstoneSortOrder.LAST)
 
+    private static Serde<TestRecord> testValueSerde() {
+        new TestJsonSerde<>(TestRecord)
+    }
+
     private static Properties driverConfig() {
         def props = new Properties()
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, 'test-app')
@@ -77,8 +80,8 @@ class ResequenceProcessorSpec extends Specification {
             KeyMapper<K, KR> keyMapper,
             ValueMapper<KR, TestRecord, TestRecord> valueMapper) {
 
-        def valueSerde = new JacksonJsonSerde<>(TestRecord)
-        def bufferedSerde = new BufferedRecordListSerde<>(TestRecord, JsonMapper.builder().build())
+        def valueSerde = testValueSerde()
+        def bufferedSerde = new BufferedRecordListSerde<>(valueSerde)
 
         def topology = new Topology()
         topology.addStateStore(Stores.keyValueStoreBuilder(
@@ -112,9 +115,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         and: 'out-of-order records'
         def baseTime = 1000L
@@ -142,9 +145,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.Long().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.Long().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'records are piped in'
         inputTopic.pipeInput(42L, new TestRecord('B', 2000L))
@@ -176,9 +179,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'a record and tombstone are piped in'
         inputTopic.pipeInput('k1', new TestRecord('A', 1000L))
@@ -202,9 +205,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'records with null and non-null keys are piped in'
         inputTopic.pipeInput(null as String, new TestRecord('A', 1000L))
@@ -228,9 +231,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'a tombstone and normal record are piped in'
         inputTopic.pipeInput('k1', null as TestRecord)
@@ -258,8 +261,8 @@ class ResequenceProcessorSpec extends Specification {
         def comparator = comparatorWith(TombstoneSortOrder.EQUAL)
 
         expect: 'comparing a tombstone to a normal record returns 0'
-        def normal = BufferedRecord.<TestRecord>builder().record(new TestRecord('A', 1000L)).build()
-        def tombstone = BufferedRecord.<TestRecord>builder().record(null).build()
+        def normal = new BufferedRecord<TestRecord>(new TestRecord('A', 1000L), 0, 0L, 0L)
+        def tombstone = new BufferedRecord<TestRecord>(null, 0, 0L, 0L)
         comparator.compare(tombstone, normal) == 0
         comparator.compare(normal, tombstone) == 0
     }
@@ -270,9 +273,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'records are sent for key1 and key2 in the first cycle'
         inputTopic.pipeInput('key1', new TestRecord('B', 2000L))
@@ -307,9 +310,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'a record is sent and first flush triggers'
         inputTopic.pipeInput('key1', new TestRecord('A', 1000L))
@@ -331,9 +334,9 @@ class ResequenceProcessorSpec extends Specification {
         driver = new TopologyTestDriver(topology, driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
-                Serdes.String().serializer(), new JacksonJsonSerde<>(TestRecord).serializer())
+                Serdes.String().serializer(), testValueSerde().serializer())
         def outputTopic = driver.createOutputTopic(SINK_TOPIC,
-                Serdes.String().deserializer(), new JacksonJsonSerde<>(TestRecord).deserializer())
+                Serdes.String().deserializer(), testValueSerde().deserializer())
 
         when: 'cycle 1: key1 gets out-of-order records'
         inputTopic.pipeInput('key1', new TestRecord('C', 3000L))

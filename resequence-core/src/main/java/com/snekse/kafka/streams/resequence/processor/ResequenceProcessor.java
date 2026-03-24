@@ -72,18 +72,27 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
     private boolean needsRecoveryScan = true;
     private KeyValueStore<K, List<BufferedRecord<V>>> store;
 
-    @SuppressWarnings({"unchecked", "unused"})
-    public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
-        this(comparator, stateStoreName, flushInterval, null, (ValueMapper<KR, V, VR>) ValueMapper.noOp());
+    /**
+     * Creates a new processor instance. Prefer {@link com.snekse.kafka.streams.resequence.Resequencer#builder()}.
+     */
+    public static <K, V, KR, VR> ResequenceProcessor<K, V, KR, VR> create(
+            ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
+            KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
+        return new ResequenceProcessor<>(comparator, stateStoreName, flushInterval, keyMapper, valueMapper);
+    }
+
+    ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval) {
+        this(comparator, stateStoreName, flushInterval, null, null);
     }
 
     @SuppressWarnings("unchecked")
-    public ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
-                               KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
+    ResequenceProcessor(ResequenceComparator<V> comparator, String stateStoreName, Duration flushInterval,
+                        KeyMapper<K, KR> keyMapper, ValueMapper<KR, V, VR> valueMapper) {
         this.comparator = comparator;
         this.stateStoreName = stateStoreName;
         this.flushInterval = flushInterval;
-        this.keyMapper = keyMapper;
+        // Defaults: identity key mapper, no-op value mapper
+        this.keyMapper = keyMapper != null ? keyMapper : key -> (KR) key;
         this.valueMapper = valueMapper != null ? valueMapper : (ValueMapper<KR, V, VR>) ValueMapper.noOp();
     }
 
@@ -107,12 +116,12 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
         }
 
         // Wrap with Kafka metadata for proper ordering
-        BufferedRecord<V> buffered = BufferedRecord.<V>builder()
-                .record(value)
-                .partition(context().recordMetadata().map(RecordMetadata::partition).orElse(-1))
-                .offset(context().recordMetadata().map(RecordMetadata::offset).orElse(-1L))
-                .timestamp(record.timestamp())
-                .build();
+        BufferedRecord<V> buffered = new BufferedRecord<>(
+                value,
+                context().recordMetadata().map(RecordMetadata::partition).orElse(-1),
+                context().recordMetadata().map(RecordMetadata::offset).orElse(-1L),
+                record.timestamp()
+        );
 
         // Get or create list for this key
         List<BufferedRecord<V>> records = store.get(key);
@@ -168,7 +177,6 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
      * Sorts, maps, and forwards all buffered records for a single key, then deletes the state store
      * entry. No-ops if {@code records} is null or empty. Called by both flush paths.
      */
-    @SuppressWarnings("unchecked")
     private void flushKey(K key, List<BufferedRecord<V>> records, long timestamp) {
         if (records == null || records.isEmpty()) {
             return;
@@ -177,8 +185,8 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
         // Sort using the injected comparator
         records.sort(comparator);
 
-        // Map the key using the provided key mapper, or pass through unchanged
-        KR outputKey = keyMapper != null ? keyMapper.map(key) : (KR) key;
+        // Map the key using the key mapper (identity by default)
+        KR outputKey = keyMapper.map(key);
 
         // Forward each record, applying the value mapper (noOp by default)
         for (BufferedRecord<V> br : records) {

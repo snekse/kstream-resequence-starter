@@ -37,6 +37,6 @@ public interface ValueMapper<KR, V, VR> {
      * @return a pass-through {@code ValueMapper}
      */
     static <KR, V> ValueMapper<KR, V, V> noOp() {
-        return (outputKey, bufferedRecord) -> bufferedRecord.getRecord();
+        return (outputKey, bufferedRecord) -> bufferedRecord.record();
     }
 }
