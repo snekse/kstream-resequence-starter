@@ -15,10 +15,12 @@ import java.util.List;
 
 public class BufferedRecordListSerde<V> implements Serde<List<BufferedRecord<V>>> {
 
-    private final Serde<V> valueSerde;
+    private final Serializer<V> valueSerializer;
+    private final Deserializer<V> valueDeserializer;
 
     public BufferedRecordListSerde(Serde<V> valueSerde) {
-        this.valueSerde = valueSerde;
+        this.valueSerializer = valueSerde.serializer();
+        this.valueDeserializer = valueSerde.deserializer();
     }
 
     @Override
@@ -37,7 +39,7 @@ public class BufferedRecordListSerde<V> implements Serde<List<BufferedRecord<V>>
                     if (value == null) {
                         out.writeInt(-1);
                     } else {
-                        byte[] valueBytes = valueSerde.serializer().serialize(topic, value);
+                        byte[] valueBytes = valueSerializer.serialize(topic, value);
                         out.writeInt(valueBytes.length);
                         out.write(valueBytes);
                     }
@@ -74,7 +76,7 @@ public class BufferedRecordListSerde<V> implements Serde<List<BufferedRecord<V>>
                     } else {
                         byte[] valueBytes = new byte[valueLength];
                         in.readFully(valueBytes);
-                        value = valueSerde.deserializer().deserialize(topic, valueBytes);
+                        value = valueDeserializer.deserialize(topic, valueBytes);
                     }
                     records.add(new BufferedRecord<>(value, partition, offset, timestamp));
                 }

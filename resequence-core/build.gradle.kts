@@ -1,10 +1,14 @@
 plugins {
     `java-library`
     groovy
+    id("io.freefair.lombok") version "9.1.0"
 }
 
 dependencies {
     api("org.apache.kafka:kafka-streams")
+
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 
     // Test only — Jackson for test value serde, Spock for BDD tests
     testImplementation("tools.jackson.core:jackson-databind")

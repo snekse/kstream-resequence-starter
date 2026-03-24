@@ -115,11 +115,11 @@ public class ResequenceProcessor<K, V, KR, VR> extends ContextualProcessor<K, V,
             return;
         }
 
-        // Wrap with Kafka metadata for proper ordering
+        var metadata = context().recordMetadata();
         BufferedRecord<V> buffered = new BufferedRecord<>(
                 value,
-                context().recordMetadata().map(RecordMetadata::partition).orElse(-1),
-                context().recordMetadata().map(RecordMetadata::offset).orElse(-1L),
+                metadata.map(RecordMetadata::partition).orElse(-1),
+                metadata.map(RecordMetadata::offset).orElse(-1L),
                 record.timestamp()
         );
 

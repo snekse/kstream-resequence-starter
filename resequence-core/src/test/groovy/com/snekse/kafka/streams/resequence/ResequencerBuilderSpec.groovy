@@ -2,12 +2,12 @@ package com.snekse.kafka.streams.resequence
 
 import com.snekse.kafka.streams.resequence.domain.BufferedRecord
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator
-import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder
 import com.snekse.kafka.streams.resequence.processor.KeyMapper
 import com.snekse.kafka.streams.resequence.processor.ValueMapper
+import com.snekse.kafka.streams.resequence.test.TestFixtures
+import com.snekse.kafka.streams.resequence.test.TestFixtures.TestRecord
 import com.snekse.kafka.streams.resequence.test.TestJsonSerde
 import org.apache.kafka.common.serialization.Serdes
-import org.apache.kafka.streams.StreamsConfig
 import org.apache.kafka.streams.Topology
 import org.apache.kafka.streams.TopologyTestDriver
 import spock.lang.AutoCleanup
@@ -16,17 +16,6 @@ import spock.lang.Specification
 import java.time.Duration
 
 class ResequencerBuilderSpec extends Specification {
-
-    static class TestRecord {
-        String type
-        long ts
-
-        TestRecord() {}
-        TestRecord(String type, long ts) {
-            this.type = type
-            this.ts = ts
-        }
-    }
 
     static final ResequenceComparator<TestRecord> TEST_COMPARATOR = { BufferedRecord<TestRecord> a, BufferedRecord<TestRecord> b ->
         def r1 = a.record
@@ -39,14 +28,6 @@ class ResequencerBuilderSpec extends Specification {
 
     @AutoCleanup
     TopologyTestDriver driver
-
-    private static Properties driverConfig() {
-        def props = new Properties()
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, 'test-app')
-        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.name)
-        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.name)
-        props
-    }
 
     def 'should throw when comparator is missing'() {
         when:
@@ -105,7 +86,7 @@ class ResequencerBuilderSpec extends Specification {
                 valueSerde.serializer(),
                 'resequencer')
 
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic('input',
                 Serdes.String().serializer(), valueSerde.serializer())
@@ -147,7 +128,7 @@ class ResequencerBuilderSpec extends Specification {
                 valueSerde.serializer(),
                 'resequencer')
 
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic('input',
                 Serdes.String().serializer(), valueSerde.serializer())
@@ -213,7 +194,7 @@ class ResequencerBuilderSpec extends Specification {
                 valueSerde.serializer(),
                 'resequencer')
 
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic('input',
                 Serdes.Long().serializer(), valueSerde.serializer())
@@ -263,7 +244,7 @@ class ResequencerBuilderSpec extends Specification {
                 valueSerde.serializer(),
                 'resequencer')
 
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic('input',
                 Serdes.String().serializer(), valueSerde.serializer())

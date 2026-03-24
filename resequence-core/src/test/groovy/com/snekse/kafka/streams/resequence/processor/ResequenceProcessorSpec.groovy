@@ -4,10 +4,11 @@ import com.snekse.kafka.streams.resequence.domain.BufferedRecord
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator
 import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder
 import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde
+import com.snekse.kafka.streams.resequence.test.TestFixtures
+import com.snekse.kafka.streams.resequence.test.TestFixtures.TestRecord
 import com.snekse.kafka.streams.resequence.test.TestJsonSerde
 import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.common.serialization.Serdes
-import org.apache.kafka.streams.StreamsConfig
 import org.apache.kafka.streams.TopologyTestDriver
 import org.apache.kafka.streams.Topology
 import org.apache.kafka.streams.state.Stores
@@ -25,20 +26,6 @@ class ResequenceProcessorSpec extends Specification {
 
     @AutoCleanup
     TopologyTestDriver driver
-
-    /**
-     * Simple test record used in place of domain-specific types.
-     */
-    static class TestRecord {
-        String type
-        long ts
-
-        TestRecord() {}
-        TestRecord(String type, long ts) {
-            this.type = type
-            this.ts = ts
-        }
-    }
 
     /** Builds a comparator that orders by type priority (A < B < C), then by ts, with configurable tombstone position. */
     private static ResequenceComparator<TestRecord> comparatorWith(TombstoneSortOrder tombstoneOrder) {
@@ -63,14 +50,6 @@ class ResequenceProcessorSpec extends Specification {
 
     private static Serde<TestRecord> testValueSerde() {
         new TestJsonSerde<>(TestRecord)
-    }
-
-    private static Properties driverConfig() {
-        def props = new Properties()
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, 'test-app')
-        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.name)
-        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.name)
-        props
     }
 
     private static <K, KR> Topology buildTopology(
@@ -112,7 +91,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should buffer and flush records sorted by comparator'() {
         given: 'a topology with String keys'
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -142,7 +121,7 @@ class ResequenceProcessorSpec extends Specification {
         given: 'a topology with Long to String re-keying'
         KeyMapper<Long, String> keyMapper = { Long key -> key + '-mapped' }
         def topology = buildTopology(Serdes.Long(), Serdes.String(), TEST_COMPARATOR, keyMapper, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.Long().serializer(), testValueSerde().serializer())
@@ -176,7 +155,7 @@ class ResequenceProcessorSpec extends Specification {
             record
         }
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, keyMapper, valueMapper)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -202,7 +181,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should skip records with null keys'() {
         given: 'a topology with String keys'
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -228,7 +207,7 @@ class ResequenceProcessorSpec extends Specification {
         given: 'a topology using a comparator configured with #order'
         def comparator = comparatorWith(order)
         def topology = buildTopology(Serdes.String(), Serdes.String(), comparator, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -270,7 +249,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should only flush records received since last flush cycle'() {
         given: 'a topology with String keys'
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -307,7 +286,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should produce no output when no records arrive between flushes'() {
         given: 'a topology with String keys'
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
@@ -331,7 +310,7 @@ class ResequenceProcessorSpec extends Specification {
     def 'should correctly flush across multiple cycles with different keys'() {
         given: 'a topology with String keys'
         def topology = buildTopology(Serdes.String(), Serdes.String(), TEST_COMPARATOR, null, null)
-        driver = new TopologyTestDriver(topology, driverConfig())
+        driver = new TopologyTestDriver(topology, TestFixtures.driverConfig())
 
         def inputTopic = driver.createInputTopic(SOURCE_TOPIC,
                 Serdes.String().serializer(), testValueSerde().serializer())
