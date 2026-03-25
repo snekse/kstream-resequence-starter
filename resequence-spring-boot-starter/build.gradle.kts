@@ -3,6 +3,7 @@ plugins {
     groovy
 }
 
+// Required for Spring Boot constructor-binding of @ConfigurationProperties (parameter names must be retained)
 tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
