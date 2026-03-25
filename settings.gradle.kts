@@ -4,4 +4,4 @@ plugins {
 
 rootProject.name = "kstream-resequence-starter"
 
-include("resequence-starter", "sample-app")
+include("resequence-core", "resequence-spring-boot-starter", "sample-app")

@@ -21,8 +21,8 @@ public class SampleRecordComparator implements ResequenceComparator<SampleRecord
 
     @Override
     public int compare(BufferedRecord<SampleRecord> o1, BufferedRecord<SampleRecord> o2) {
-        SampleRecord r1 = o1.getRecord();
-        SampleRecord r2 = o2.getRecord();
+        SampleRecord r1 = o1.record();
+        SampleRecord r2 = o2.record();
 
         // Handle null records (tombstones) based on configuration
         if (r1 == null && r2 == null) {
@@ -51,10 +51,10 @@ public class SampleRecordComparator implements ResequenceComparator<SampleRecord
         }
 
         // 3. Kafka metadata tiebreaker
-        if (o1.getPartition() == o2.getPartition()) {
-            return Long.compare(o1.getOffset(), o2.getOffset());
+        if (o1.partition() == o2.partition()) {
+            return Long.compare(o1.offset(), o2.offset());
         }
 
-        return Long.compare(o1.getTimestamp(), o2.getTimestamp());
+        return Long.compare(o1.timestamp(), o2.timestamp());
     }
 }

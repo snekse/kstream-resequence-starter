@@ -1,28 +1,19 @@
 package com.example.sampleapp.config;
 
-import com.example.sampleapp.domain.SampleRecordComparator;
 import com.example.sampleapp.domain.SampleRecord;
-import com.snekse.kafka.streams.resequence.config.ResequenceProperties;
-import com.snekse.kafka.streams.resequence.domain.BufferedRecord;
+import com.example.sampleapp.domain.SampleRecordComparator;
+import com.snekse.kafka.streams.resequence.Resequencer;
 import com.snekse.kafka.streams.resequence.domain.ResequenceComparator;
-import com.snekse.kafka.streams.resequence.processor.KeyMapper;
-import com.snekse.kafka.streams.resequence.processor.ResequenceProcessor;
-import com.snekse.kafka.streams.resequence.processor.ValueMapper;
-import com.snekse.kafka.streams.resequence.serde.BufferedRecordListSerde;
+import com.snekse.kafka.streams.resequence.spring.ResequenceProperties;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.state.Stores;
 import org.springframework.beans.factory.annotation.Value;
-import tools.jackson.databind.json.JsonMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.support.serializer.JacksonJsonSerde;
-
-import java.util.List;
-import java.util.Objects;
 
 @Configuration
 @EnableKafkaStreams
@@ -31,12 +22,6 @@ public class ResequenceTopologyConfig {
     @Bean
     public Serde<SampleRecord> sampleRecordSerde() {
         return new JacksonJsonSerde<>(SampleRecord.class);
-    }
-
-    @Bean
-    public Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde(JsonMapper objectMapper) {
-        Objects.requireNonNull(objectMapper, "ObjectMapper must not be null");
-        return new BufferedRecordListSerde<>(SampleRecord.class, objectMapper);
     }
 
     @Bean
@@ -49,19 +34,30 @@ public class ResequenceTopologyConfig {
             @Value("${app.pipeline.source.topic}") String sourceTopic,
             @Value("${app.pipeline.sink.topic}") String sinkTopic,
             ResequenceProperties resequenceProperties,
-            StreamsBuilder builder,
             Serde<SampleRecord> sampleRecordSerde,
-            Serde<List<BufferedRecord<SampleRecord>>> bufferedRecordListSerde,
-            ResequenceComparator<SampleRecord> resequenceComparator) {
+            ResequenceComparator<SampleRecord> resequenceComparator,
+            StreamsBuilder builder) {
 
-        String stateStoreName = resequenceProperties.getStateStoreName();
+        // Create a fresh builder rather than injecting the auto-configured Builder<?, ?, ?, ?>
+        // because keyMapper() and valueMapper() change the builder's type parameters, which is
+        // incompatible with wildcard injection. Properties are applied manually instead.
+        var resequencer = Resequencer.<Long, SampleRecord>builder()
+                .comparator(resequenceComparator)
+                .valueSerde(sampleRecordSerde)
+                .keySerde(Serdes.Long())
+                .stateStoreName(resequenceProperties.getStateStoreName())
+                .flushInterval(resequenceProperties.getFlushInterval())
+                .keyMapper(key -> key + "-sorted")
+                .valueMapper((outputKey, buffered) -> {
+                    SampleRecord record = buffered.record();
+                    if (record != null) {
+                        record.setNewKey(outputKey);
+                    }
+                    return record;
+                })
+                .build();
+
         Topology topology = builder.build();
-
-        // Add state store
-        topology.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(stateStoreName),
-                Serdes.Long(),
-                bufferedRecordListSerde));
 
         // Add source
         topology.addSource("source",
@@ -69,25 +65,8 @@ public class ResequenceTopologyConfig {
                 sampleRecordSerde.deserializer(),
                 sourceTopic);
 
-        // Re-key from Long to String with "-sorted" suffix
-        KeyMapper<Long, String> keyMapper = key -> key + "-sorted";
-
-        // Enrich each record with the mapped output key so downstream consumers can read it from the value
-        ValueMapper<String, SampleRecord, SampleRecord> valueMapper = (outputKey, buffered) -> {
-            SampleRecord record = buffered.getRecord();
-            if (record != null) {
-                record.setNewKey(outputKey);
-            }
-            return record;
-        };
-
-        // Add processor with injected comparator, state store name, and flush interval
-        topology.addProcessor("resequencer",
-                () -> new ResequenceProcessor<>(resequenceComparator, stateStoreName, resequenceProperties.getFlushInterval(), keyMapper, valueMapper),
-                "source");
-
-        // Connect state store to processor
-        topology.connectProcessorAndStateStores("resequencer", stateStoreName);
+        // Add resequencer (processor + state store)
+        resequencer.addTo(topology, "resequencer", "source");
 
         // Add sink
         topology.addSink("sink",

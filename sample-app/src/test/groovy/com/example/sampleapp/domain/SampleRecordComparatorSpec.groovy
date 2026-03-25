@@ -82,18 +82,8 @@ class SampleRecordComparatorSpec extends Specification {
         def baseTimestamp = System.currentTimeMillis()
         def create = bufferedRecord('CREATE', baseTimestamp, 0, 0, baseTimestamp)
         def update = bufferedRecord('UPDATE', baseTimestamp, 0, 1, baseTimestamp)
-        def tombstone1 = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(2)
-                .timestamp(baseTimestamp)
-                .build()
-        def tombstone2 = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(3)
-                .timestamp(baseTimestamp)
-                .build()
+        def tombstone1 = new BufferedRecord<>(null, 0, 2, baseTimestamp)
+        def tombstone2 = new BufferedRecord<>(null, 0, 3, baseTimestamp)
 
         when: 'sorted using the comparator'
         def records = [tombstone1, update, tombstone2, create]
@@ -108,18 +98,8 @@ class SampleRecordComparatorSpec extends Specification {
 
     def 'should compare two null records as equal'() {
         given: 'two tombstone records'
-        def tombstone1 = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(0)
-                .timestamp(1000L)
-                .build()
-        def tombstone2 = BufferedRecord.builder()
-                .record(null)
-                .partition(1)
-                .offset(1)
-                .timestamp(2000L)
-                .build()
+        def tombstone1 = new BufferedRecord<>(null, 0, 0, 1000L)
+        def tombstone2 = new BufferedRecord<>(null, 1, 1, 2000L)
 
         when: 'comparing them'
         def result = comparator.compare(tombstone1, tombstone2)
@@ -131,12 +111,7 @@ class SampleRecordComparatorSpec extends Specification {
     def 'should sort null record after non-null record'() {
         given: 'one tombstone and one normal record'
         def normalRecord = bufferedRecord('UPDATE', 1000L, 0, 0, 1000L)
-        def tombstone = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(1)
-                .timestamp(500L)
-                .build()
+        def tombstone = new BufferedRecord<>(null, 0, 1, 500L)
 
         expect: 'tombstone is greater than normal record'
         comparator.compare(tombstone, normalRecord) > 0
@@ -150,12 +125,7 @@ class SampleRecordComparatorSpec extends Specification {
         def equalComparator = new SampleRecordComparator(TombstoneSortOrder.EQUAL)
         def baseTimestamp = System.currentTimeMillis()
         def normalRecord = bufferedRecord('UPDATE', baseTimestamp, 0, 0, baseTimestamp)
-        def tombstone = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(1)
-                .timestamp(baseTimestamp)
-                .build()
+        def tombstone = new BufferedRecord<>(null, 0, 1, baseTimestamp)
 
         when: 'comparing normal record to tombstone'
         def result = equalComparator.compare(normalRecord, tombstone)
@@ -172,12 +142,7 @@ class SampleRecordComparatorSpec extends Specification {
         def firstComparator = new SampleRecordComparator(TombstoneSortOrder.FIRST)
         def baseTimestamp = System.currentTimeMillis()
         def normalRecord = bufferedRecord('UPDATE', baseTimestamp, 0, 0, baseTimestamp)
-        def tombstone = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(1)
-                .timestamp(baseTimestamp)
-                .build()
+        def tombstone = new BufferedRecord<>(null, 0, 1, baseTimestamp)
 
         when: 'comparing normal record to tombstone'
         def result = firstComparator.compare(normalRecord, tombstone)
@@ -194,18 +159,8 @@ class SampleRecordComparatorSpec extends Specification {
         def baseTimestamp = System.currentTimeMillis()
         def create = bufferedRecord('CREATE', baseTimestamp, 0, 0, baseTimestamp)
         def update = bufferedRecord('UPDATE', baseTimestamp, 0, 1, baseTimestamp)
-        def tombstone1 = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(2)
-                .timestamp(baseTimestamp)
-                .build()
-        def tombstone2 = BufferedRecord.builder()
-                .record(null)
-                .partition(0)
-                .offset(3)
-                .timestamp(baseTimestamp)
-                .build()
+        def tombstone1 = new BufferedRecord<>(null, 0, 2, baseTimestamp)
+        def tombstone2 = new BufferedRecord<>(null, 0, 3, baseTimestamp)
 
         when: 'sorting with FIRST configuration'
         def firstComparator = new SampleRecordComparator(TombstoneSortOrder.FIRST)
@@ -284,11 +239,6 @@ class SampleRecordComparatorSpec extends Specification {
                 .entityType(EntityType.Parent)
                 .build()
 
-        return BufferedRecord.builder()
-                .record(record)
-                .partition(partition)
-                .offset(offset)
-                .timestamp(kafkaTimestamp)
-                .build()
+        return new BufferedRecord<>(record, partition, offset, kafkaTimestamp)
     }
 }
