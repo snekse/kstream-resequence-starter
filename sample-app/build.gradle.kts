@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":resequence-starter"))
+    implementation(project(":resequence-spring-boot-starter"))
 implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.springframework.boot:spring-boot-starter-json")
     implementation("org.apache.kafka:kafka-streams")

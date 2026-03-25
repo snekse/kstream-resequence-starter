@@ -1,4 +1,4 @@
-package com.snekse.kafka.streams.resequence.config;
+package com.snekse.kafka.streams.resequence.spring;
 
 import com.snekse.kafka.streams.resequence.domain.TombstoneSortOrder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
